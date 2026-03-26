@@ -1,0 +1,10 @@
+[package]
+name = "sui_loyalty"
+edition = "2024"
+authors = ["Tatenda Marimo"]
+
+[dependencies]
+Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "framework/testnet" }
+
+[addresses]
+sui_loyalty = "0x0"
