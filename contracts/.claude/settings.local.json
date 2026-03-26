@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(sui move:*)",
+      "Bash(curl:*)",
+      "Bash(sui client:*)"
+    ]
+  }
+}
