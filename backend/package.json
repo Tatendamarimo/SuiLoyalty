@@ -9,7 +9,7 @@
   "keywords": [],
   "author": "Tatenda Marimo",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "dependencies": {
     "@mysten/sui": "^2.12.0",
     "@mysten/zklogin": "^0.7.10",
