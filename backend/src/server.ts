@@ -3,7 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { generateQRToken, validateQRToken } from './services/qr.service.js';
-import { generateEphemeralKeypair, deriveSalt, computeSuiAddress } from './services/zklogin.service.js';
+import { generateEphemeralKeypair } from './services/zklogin.service.js';
+import { getLoyaltyCard } from './services/nft.service.js';
 
 dotenv.config();
 
@@ -43,8 +44,8 @@ app.post('/api/qr/validate', async (req, res) => {
 app.post('/api/auth/zklogin', async (req, res) => {
   try {
     const { SuiJsonRpcClient, getJsonRpcFullnodeUrl } = await import('@mysten/sui/jsonRpc');
-    const suiClient = new SuiJsonRpcClient({ url: getJsonRpcFullnodeUrl('devnet'), network: 'devnet' });
-    const { epoch } = await suiClient.getLatestSuiSystemState();
+    const client = new SuiJsonRpcClient({ url: getJsonRpcFullnodeUrl('devnet'), network: 'devnet' });
+    const { epoch } = await client.getLatestSuiSystemState();
     const ephemeral = generateEphemeralKeypair(Number(epoch));
 
     const params = new URLSearchParams({
@@ -69,6 +70,18 @@ app.post('/api/auth/zklogin', async (req, res) => {
 
 app.get('/api/auth/session', (req, res) => {
   res.json({ authenticated: false });
+});
+
+app.get('/api/nft/:address', async (req, res) => {
+  try {
+    const card = await getLoyaltyCard(req.params.address);
+    if (!card) {
+      return res.status(404).json({ success: false, error: 'No loyalty card found' });
+    }
+    res.json({ success: true, card });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.listen(PORT, () => {
