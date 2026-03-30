@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
-import { Router } from 'express';
 import { generateQRToken, validateQRToken } from './services/qr.service.js';
+import { generateEphemeralKeypair, deriveSalt, computeSuiAddress } from './services/zklogin.service.js';
 
 dotenv.config();
 
@@ -38,6 +38,37 @@ app.post('/api/qr/validate', async (req, res) => {
   } catch (error: any) {
     res.status(400).json({ success: false, error: error.message });
   }
+});
+
+app.post('/api/auth/zklogin', async (req, res) => {
+  try {
+    const { SuiJsonRpcClient, getJsonRpcFullnodeUrl } = await import('@mysten/sui/jsonRpc');
+    const suiClient = new SuiJsonRpcClient({ url: getJsonRpcFullnodeUrl('devnet'), network: 'devnet' });
+    const { epoch } = await suiClient.getLatestSuiSystemState();
+    const ephemeral = generateEphemeralKeypair(Number(epoch));
+
+    const params = new URLSearchParams({
+      client_id: process.env.GOOGLE_CLIENT_ID!,
+      redirect_uri: 'http://localhost:3000/api/auth/callback',
+      response_type: 'code',
+      scope: 'openid email profile',
+      nonce: ephemeral.nonce,
+    });
+
+    res.json({
+      success: true,
+      authUrl: `https://accounts.google.com/o/oauth2/v2/auth?${params}`,
+      ephemeralPublicKey: ephemeral.ephemeralPublicKey,
+      maxEpoch: ephemeral.maxEpoch,
+      randomness: ephemeral.randomness,
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/auth/session', (req, res) => {
+  res.json({ authenticated: false });
 });
 
 app.listen(PORT, () => {
