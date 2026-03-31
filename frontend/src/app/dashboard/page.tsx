@@ -2,34 +2,106 @@
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 
-function DashboardContent() {
-  const params = useSearchParams();
-  const address = params.get("address") || "";
-  const name = params.get("name") || "Customer";
-  const [card, setCard] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+type BrandCard = {
+  brand_id: string;
+  brand_name: string;
+  brand_color: string;
+  brand_category: string;
+  points_balance: number;
+  tier: number;
+  scan_count: number;
+};
 
-  useEffect(() => {
-    if (!address) return;
-    fetch(`http://localhost:3000/api/nft/${address}`)
-      .then(r => r.json())
-      .then(data => { setCard(data.card || null); setLoading(false); })
-      .catch(() => setLoading(false));
-  }, [address]);
-
-  const tierName = (t: number) => ["Bronze", "Silver", "Gold"][t] || "Bronze";
-  const tierGradient = (t: number) => [
+function tierName(t: number) { return ["Bronze", "Silver", "Gold"][t] || "Bronze"; }
+function tierGradient(t: number) {
+  return [
     "linear-gradient(135deg, #CD7F32, #8B4513)",
     "linear-gradient(135deg, #C0C0C0, #808080)",
     "linear-gradient(135deg, #FFD700, #B8860B)",
   ][t] || "linear-gradient(135deg, #CD7F32, #8B4513)";
-  const nextTier = (t: number) => t >= 2 ? 500 : t >= 1 ? 500 : 100;
-  const progress = (points: number, tier: number) => tier >= 2 ? 100 : Math.min(100, (points / nextTier(tier)) * 100);
+}
+function nextTierPts(t: number) { return t >= 1 ? 500 : 100; }
+function progress(pts: number, t: number) { return t >= 2 ? 100 : Math.min(100, (pts / nextTierPts(t)) * 100); }
+
+function BrandCardUI({ card }: { card: BrandCard }) {
+  const pts = card.points_balance;
+  const t = card.tier;
+  const color = card.brand_color || "#6366f1";
+
+  return (
+    <div style={{
+      background: "rgba(255,255,255,0.03)",
+      border: `1px solid ${color}33`,
+      borderRadius: "16px",
+      padding: "20px",
+      marginBottom: "12px",
+      position: "relative",
+      overflow: "hidden",
+    }}>
+      <div style={{ position: "absolute", top: "-30px", right: "-30px", width: "90px", height: "90px", borderRadius: "50%", background: `${color}18`, pointerEvents: "none" }} />
+
+      {/* Brand header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: `${color}22`, border: `1px solid ${color}44`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: "14px", fontWeight: "800", color }}>{card.brand_name[0]}</span>
+          </div>
+          <div>
+            <div style={{ fontSize: "14px", fontWeight: "700", color: "#e2e8f0" }}>{card.brand_name}</div>
+            <div style={{ fontSize: "11px", color: "#64748b" }}>{card.brand_category}</div>
+          </div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Tier</div>
+          <div style={{ fontSize: "13px", fontWeight: "700", background: tierGradient(t), WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{tierName(t)}</div>
+        </div>
+      </div>
+
+      {/* Points */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "12px" }}>
+        <div>
+          <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "2px" }}>Points</div>
+          <div style={{ fontSize: "32px", fontWeight: "800", color, lineHeight: 1 }}>{pts.toLocaleString()}</div>
+        </div>
+        <div style={{ fontSize: "11px", color: "#64748b" }}>{card.scan_count} scan{card.scan_count !== 1 ? "s" : ""}</div>
+      </div>
+
+      {/* Progress bar */}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+          <span style={{ fontSize: "10px", color: "#64748b" }}>
+            {t >= 2 ? "Max tier" : `${nextTierPts(t) - pts} pts to ${t >= 1 ? "Gold" : "Silver"}`}
+          </span>
+          <span style={{ fontSize: "10px", color: "#64748b" }}>{Math.round(progress(pts, t))}%</span>
+        </div>
+        <div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "2px", overflow: "hidden" }}>
+          <div style={{ height: "100%", borderRadius: "2px", background: color, width: `${progress(pts, t)}%`, transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardContent() {
+  const params = useSearchParams();
+  const address = params.get("address") || "";
+  const name = params.get("name") || "Customer";
+  const [cards, setCards] = useState<BrandCard[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!address) return;
+    fetch(`http://localhost:3000/api/loyalty-cards/${address}`)
+      .then(r => r.json())
+      .then(data => { setCards(data.cards || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [address]);
+
+  const totalPoints = cards.reduce((sum, c) => sum + c.points_balance, 0);
+  const totalScans = cards.reduce((sum, c) => sum + c.scan_count, 0);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0a0e1a", padding: "0" }}>
-
-      {/* Ambient background orbs */}
       <div style={{ position: "fixed", top: "10%", left: "15%", width: "300px", height: "300px", borderRadius: "50%", background: "rgba(99,102,241,0.08)", filter: "blur(80px)", pointerEvents: "none" }} />
       <div style={{ position: "fixed", bottom: "20%", right: "10%", width: "250px", height: "250px", borderRadius: "50%", background: "rgba(6,182,212,0.06)", filter: "blur(80px)", pointerEvents: "none" }} />
 
@@ -64,66 +136,12 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* Main loyalty card */}
-        <div style={{
-          background: "linear-gradient(135deg, rgba(99,102,241,0.15), rgba(6,182,212,0.08))",
-          border: "1px solid rgba(99,102,241,0.25)",
-          borderRadius: "20px",
-          padding: "28px",
-          marginBottom: "16px",
-          backdropFilter: "blur(12px)",
-          position: "relative",
-          overflow: "hidden",
-        }}>
-          {/* Card shine effect */}
-          <div style={{ position: "absolute", top: "-40px", right: "-40px", width: "120px", height: "120px", borderRadius: "50%", background: "rgba(99,102,241,0.1)", pointerEvents: "none" }} />
-
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "28px" }}>
-            <div>
-              <div style={{ fontSize: "11px", color: "#64748b", letterSpacing: "0.5px", textTransform: "uppercase", marginBottom: "4px" }}>Loyalty Points</div>
-              <div style={{ fontSize: "42px", fontWeight: "800", background: "linear-gradient(135deg, #6366f1, #06b6d4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1 }}>
-                {loading ? "—" : (card?.points || 0).toLocaleString()}
-              </div>
-            </div>
-            <div style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Tier</div>
-              <div style={{ fontSize: "15px", fontWeight: "700", background: tierGradient(card?.tier || 0), WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
-                {loading ? "—" : tierName(card?.tier || 0)}
-              </div>
-              <div style={{ display: "flex", gap: "4px", marginTop: "6px", justifyContent: "flex-end" }}>
-                {[0,1,2].map(i => (
-                  <div key={i} style={{ width: "6px", height: "6px", borderRadius: "50%", background: i <= (card?.tier || 0) ? tierGradient(card?.tier || 0) : "rgba(255,255,255,0.1)" }} />
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Progress bar */}
-          <div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
-              <span style={{ fontSize: "11px", color: "#64748b" }}>
-                {card?.tier >= 2 ? "Maximum tier reached" : `${nextTier(card?.tier || 0) - (card?.points || 0)} pts to ${["Silver","Gold","Gold"][card?.tier || 0]}`}
-              </span>
-              <span style={{ fontSize: "11px", color: "#64748b" }}>{Math.round(progress(card?.points || 0, card?.tier || 0))}%</span>
-            </div>
-            <div style={{ height: "5px", background: "rgba(255,255,255,0.06)", borderRadius: "3px", overflow: "hidden" }}>
-              <div style={{
-                height: "100%",
-                borderRadius: "3px",
-                background: "linear-gradient(90deg, #6366f1, #06b6d4)",
-                width: `${progress(card?.points || 0, card?.tier || 0)}%`,
-                transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)",
-              }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Stats row */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "16px" }}>
+        {/* Summary stats */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "24px" }}>
           {[
-            { label: "Scans", value: loading ? "—" : (card?.scan_count || 0) },
-            { label: "Status", value: card ? "Active" : "New" },
-            { label: "Network", value: "Sui" },
+            { label: "Total Points", value: loading ? "—" : totalPoints.toLocaleString() },
+            { label: "Brands", value: loading ? "—" : cards.length },
+            { label: "Scans", value: loading ? "—" : totalScans },
           ].map(({ label, value }) => (
             <div key={label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "14px 12px", textAlign: "center" }}>
               <div style={{ fontSize: "18px", fontWeight: "700", color: "#e2e8f0" }}>{value}</div>
@@ -132,16 +150,21 @@ function DashboardContent() {
           ))}
         </div>
 
-        {/* On-chain proof */}
-        {card?.objectId && (
-          <div style={{ background: "rgba(6,182,212,0.05)", border: "1px solid rgba(6,182,212,0.15)", borderRadius: "12px", padding: "12px 16px", marginBottom: "16px", display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#06b6d4", flexShrink: 0 }} />
-            <div>
-              <div style={{ fontSize: "11px", color: "#06b6d4", marginBottom: "2px" }}>On-chain NFT</div>
-              <div style={{ fontSize: "10px", color: "#334155", fontFamily: "monospace" }}>{card.objectId.slice(0,12)}...{card.objectId.slice(-8)}</div>
+        {/* Brand cards */}
+        <div style={{ marginBottom: "8px" }}>
+          <div style={{ fontSize: "12px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "12px" }}>Your Loyalty Cards</div>
+
+          {loading ? (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: "14px" }}>Loading...</div>
+          ) : cards.length === 0 ? (
+            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: "16px", padding: "32px", textAlign: "center" }}>
+              <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "4px" }}>No loyalty cards yet</div>
+              <div style={{ fontSize: "11px", color: "#334155" }}>Scan a brand QR code to get started</div>
             </div>
-          </div>
-        )}
+          ) : (
+            cards.map(card => <BrandCardUI key={card.brand_id} card={card} />)
+          )}
+        </div>
 
         {/* Scan button */}
         <button
@@ -158,6 +181,7 @@ function DashboardContent() {
             cursor: "pointer",
             letterSpacing: "0.3px",
             boxShadow: "0 4px 24px rgba(99,102,241,0.3)",
+            marginTop: "16px",
           }}
         >
           Scan QR Code to Earn Points
