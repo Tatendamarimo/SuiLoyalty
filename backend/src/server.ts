@@ -1,12 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import dotenv from 'dotenv';
 import { generateQRToken, validateQRToken } from './services/qr.service.js';
-import { generateEphemeralKeypair } from './services/zklogin.service.js';
+import { generateEphemeralKeypair, deriveSalt, computeSuiAddress } from './services/zklogin.service.js';
 import { getLoyaltyCard } from './services/nft.service.js';
-
-dotenv.config();
+import pool from './config/database.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -68,6 +69,49 @@ app.post('/api/auth/zklogin', async (req, res) => {
   }
 });
 
+app.get('/api/auth/callback', async (req, res) => {
+  try {
+    const { code } = req.query;
+    if (!code) return res.status(400).json({ error: 'No code provided' });
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: code as string,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: 'http://localhost:3000/api/auth/callback',
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    const tokenData = await tokenRes.json();
+    const jwt = tokenData.id_token;
+    if (!jwt) return res.status(400).json({ error: 'No JWT received', details: tokenData });
+
+    const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
+    const googleSub = payload.sub;
+    const email = payload.email;
+    const name = payload.name || email;
+
+    const salt = deriveSalt(googleSub);
+    const suiAddress = computeSuiAddress(jwt, salt);
+
+    await pool.query(
+      `INSERT INTO users (wallet_address, email, display_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (wallet_address) DO UPDATE
+       SET email = $2, display_name = $3`,
+      [suiAddress, email, name]
+    );
+
+    res.redirect(`http://localhost:3001/dashboard?address=${suiAddress}&name=${encodeURIComponent(name)}`);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 app.get('/api/auth/session', (req, res) => {
   res.json({ authenticated: false });
 });
@@ -86,4 +130,5 @@ app.get('/api/nft/:address', async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(`SuiLoyalty backend running on port ${PORT}`);
+  console.log(`Google Client ID: ${process.env.GOOGLE_CLIENT_ID?.slice(0, 20)}...`);
 });
