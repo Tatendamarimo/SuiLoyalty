@@ -29,10 +29,39 @@ app.get('/api/brands', async (_req, res) => {
   }
 });
 
-app.post('/api/qr/generate', async (req, res) => {
+app.post('/api/qr/mark-printed', async (req, res) => {
+  try {
+    const { token_uuids } = req.body;
+    if (!Array.isArray(token_uuids) || token_uuids.length === 0) {
+      return res.status(400).json({ success: false, error: 'token_uuids array required' });
+    }
+    await pool.query(
+      `UPDATE qr_tokens SET printed = TRUE WHERE token_uuid = ANY($1)`,
+      [token_uuids]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to mark tokens as printed' });
+  }
+});
+
+app.post('/api/qr/clear-unprinted', async (req, res) => {
   try {
     const { brand_id } = req.body;
-    const token = await generateQRToken(brand_id);
+    await pool.query(
+      `DELETE FROM qr_tokens WHERE brand_id = $1 AND printed = FALSE AND used = FALSE`,
+      [brand_id]
+    );
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, error: 'Failed to clear tokens' });
+  }
+});
+
+app.post('/api/qr/generate', async (req, res) => {
+  try {
+    const { brand_id, points_value } = req.body;
+    const token = await generateQRToken(brand_id, points_value);
     res.status(201).json({ success: true, token });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to generate token' });
@@ -131,6 +160,21 @@ app.get('/api/auth/callback', async (req, res) => {
 
 app.get('/api/auth/session', (req, res) => {
   res.json({ authenticated: false });
+});
+
+app.get('/api/user/:address', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT wallet_address, display_name, email FROM users WHERE wallet_address = $1',
+      [req.params.address]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    res.json({ success: true, user: result.rows[0] });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 app.get('/api/nft/:address', async (req, res) => {

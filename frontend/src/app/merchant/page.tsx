@@ -38,12 +38,18 @@ export default function Merchant() {
     setLoading(true);
     setTokens([]);
 
+    await fetch("http://localhost:3000/api/qr/clear-unprinted", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ brand_id: selectedBrand.id }),
+    });
+
     const results: QRToken[] = [];
     for (let i = 0; i < quantity; i++) {
       const res = await fetch("http://localhost:3000/api/qr/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ brand_id: selectedBrand.id }),
+        body: JSON.stringify({ brand_id: selectedBrand.id, points_value: pointsPerScan }),
       });
       const data = await res.json();
       if (data.success) results.push({ token_uuid: data.token.token_uuid });
@@ -62,8 +68,10 @@ export default function Merchant() {
           colorLight: "#ffffff",
         });
         await new Promise(r => setTimeout(r, 100));
+        const canvas = div.querySelector("canvas") as HTMLCanvasElement;
         const img = div.querySelector("img") as HTMLImageElement;
-        if (img) token.dataUrl = img.src;
+        if (canvas) token.dataUrl = canvas.toDataURL("image/png");
+        else if (img) token.dataUrl = img.src;
       }
     }
 
@@ -71,7 +79,7 @@ export default function Merchant() {
     setLoading(false);
   }
 
-  function downloadAll() {
+  async function downloadAll() {
     tokens.forEach((token, i) => {
       if (!token.dataUrl) return;
       const a = document.createElement("a");
@@ -79,6 +87,12 @@ export default function Merchant() {
       a.download = `${selectedBrand?.name}_qr_${i + 1}.png`;
       a.click();
     });
+    await fetch("http://localhost:3000/api/qr/mark-printed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token_uuids: tokens.map(t => t.token_uuid) }),
+    });
+    setTokens([]);
   }
 
   return (
@@ -96,7 +110,7 @@ export default function Merchant() {
           <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "12px" }}>Select Brand</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
             {brands.map(brand => (
-              <button key={brand.id} onClick={() => setSelectedBrand(brand)} style={{
+              <button key={brand.id} onClick={() => { setSelectedBrand(brand); setTokens([]); }} style={{
                 padding: "14px",
                 background: selectedBrand?.id === brand.id ? `${brand.color}22` : "rgba(255,255,255,0.03)",
                 border: `1px solid ${selectedBrand?.id === brand.id ? brand.color : "rgba(255,255,255,0.08)"}`,

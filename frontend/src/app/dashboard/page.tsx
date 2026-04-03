@@ -84,10 +84,35 @@ function BrandCardUI({ card }: { card: BrandCard }) {
 
 function DashboardContent() {
   const params = useSearchParams();
-  const address = params.get("address") || "";
-  const name = params.get("name") || "Customer";
+  const [address, setAddress] = useState("");
+  const [name, setName] = useState("Customer");
   const [cards, setCards] = useState<BrandCard[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const paramAddress = params.get("address");
+    const paramName = params.get("name");
+    if (paramAddress) {
+      localStorage.setItem("sui_address", paramAddress);
+      if (paramName) localStorage.setItem("sui_name", decodeURIComponent(paramName));
+    }
+    const addr = paramAddress || localStorage.getItem("sui_address") || "";
+    const storedName = paramName ? decodeURIComponent(paramName) : localStorage.getItem("sui_name") || "";
+    setAddress(addr);
+    if (storedName) {
+      setName(storedName);
+    } else if (addr) {
+      fetch(`http://localhost:3000/api/user/${addr}`)
+        .then(r => r.json())
+        .then(data => {
+          if (data.success && data.user.display_name) {
+            setName(data.user.display_name);
+            localStorage.setItem("sui_name", data.user.display_name);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [params]);
 
   useEffect(() => {
     if (!address) return;

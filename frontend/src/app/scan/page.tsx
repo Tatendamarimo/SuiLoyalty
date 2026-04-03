@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 
 function ScanContent() {
   const params = useSearchParams();
-  const address = params.get("address") || "";
+  const address = params.get("address") || localStorage.getItem("sui_address") || "";
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [status, setStatus] = useState<"scanning" | "success" | "error" | "idle">("idle");
@@ -15,7 +15,7 @@ function ScanContent() {
 
   async function startCamera() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
@@ -47,14 +47,13 @@ function ScanContent() {
       return;
     }
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) { requestAnimationFrame(scanFrame); return; }
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     ctx.drawImage(video, 0, 0);
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
     const jsQR = (await import("jsqr")).default;
-    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
 
     if (code) {
       scanningRef.current = false;
@@ -137,6 +136,9 @@ function ScanContent() {
                 <div style={{ position: "absolute", top: 0, right: 0, width: "20px", height: "20px", borderTop: "3px solid #6366f1", borderRight: "3px solid #6366f1", borderRadius: "0 4px 0 0" }} />
                 <div style={{ position: "absolute", bottom: 0, left: 0, width: "20px", height: "20px", borderBottom: "3px solid #6366f1", borderLeft: "3px solid #6366f1", borderRadius: "0 0 0 4px" }} />
                 <div style={{ position: "absolute", bottom: 0, right: 0, width: "20px", height: "20px", borderBottom: "3px solid #6366f1", borderRight: "3px solid #6366f1", borderRadius: "0 0 4px 0" }} />
+              </div>
+              <div style={{ position: "absolute", bottom: "16px", left: 0, right: 0, textAlign: "center", fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>
+                Scanning...
               </div>
             </div>
           )}

@@ -1,15 +1,14 @@
 import { randomUUID } from 'crypto';
 import pool from '../config/database.js';
 
-export async function generateQRToken(brand_id?: string) {
+export async function generateQRToken(brand_id?: string, points_value?: number) {
   const token_uuid = randomUUID();
-  const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   const result = await pool.query(
-    `INSERT INTO qr_tokens (token_uuid, expires_at, brand_id)
-     VALUES ($1, $2, $3)
+    `INSERT INTO qr_tokens (token_uuid, expires_at, brand_id, points_value)
+     VALUES ($1, NULL, $2, $3)
      RETURNING *`,
-    [token_uuid, expires_at, brand_id || null]
+    [token_uuid, brand_id || null, points_value ?? 10]
   );
 
   return result.rows[0];
@@ -38,13 +37,19 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
     const token = tokenResult.rows[0];
 
     if (token.brand_id) {
+      const pointsToAdd = token.points_value ?? 10;
       await client.query(
         `INSERT INTO loyalty_cards (on_chain_card_id, user_id, brand_id, points_balance, scan_count)
          VALUES (gen_random_uuid()::text, $1, $2, $3, 1)
          ON CONFLICT (user_id, brand_id) DO UPDATE
          SET points_balance = loyalty_cards.points_balance + $3,
-             scan_count = loyalty_cards.scan_count + 1`,
-        [user_id, token.brand_id, token.points_value]
+             scan_count = loyalty_cards.scan_count + 1,
+             tier = CASE
+               WHEN loyalty_cards.points_balance + $3 >= 500 THEN 2
+               WHEN loyalty_cards.points_balance + $3 >= 100 THEN 1
+               ELSE 0
+             END`,
+        [user_id, token.brand_id, pointsToAdd]
       );
     }
 
