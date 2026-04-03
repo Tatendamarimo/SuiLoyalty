@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import pool from '../config/database.js';
+import { mintCardOnChain, earnPointsOnChain } from './blockchain.service.js';
 
 export async function generateQRToken(brand_id?: string, points_value?: number) {
   const token_uuid = randomUUID();
@@ -19,6 +20,7 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
   try {
     await client.query('BEGIN');
 
+    // 1. Atomically mark QR as used
     const tokenResult = await client.query(
       `UPDATE qr_tokens
        SET used = TRUE, used_by = $2, used_at = NOW()
@@ -35,27 +37,57 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
     }
 
     const token = tokenResult.rows[0];
-
-    if (token.brand_id) {
-      const pointsToAdd = token.points_value ?? 10;
-      await client.query(
-        `INSERT INTO loyalty_cards (on_chain_card_id, user_id, brand_id, points_balance, scan_count)
-         VALUES (gen_random_uuid()::text, $1, $2, $3, 1)
-         ON CONFLICT (user_id, brand_id) DO UPDATE
-         SET points_balance = loyalty_cards.points_balance + $3,
-             scan_count = loyalty_cards.scan_count + 1,
-             tier = CASE
-               WHEN loyalty_cards.points_balance + $3 >= 500 THEN 2
-               WHEN loyalty_cards.points_balance + $3 >= 100 THEN 1
-               ELSE 0
-             END`,
-        [user_id, token.brand_id, pointsToAdd]
-      );
-    }
-
     await client.query('COMMIT');
 
-    // Return token with brand info
+    const pointsToAdd = token.points_value ?? 10;
+    let txDigest: string | null = null;
+
+    if (token.brand_id) {
+      // 2. Check whether this user already has a card for this brand
+      const existingCard = await pool.query(
+        `SELECT on_chain_card_id FROM loyalty_cards WHERE user_id = $1 AND brand_id = $2`,
+        [user_id, token.brand_id]
+      );
+
+      let cardObjectId: string;
+
+      if (existingCard.rows.length === 0) {
+        // No card yet — mint one on-chain (card goes to backend wallet)
+        const userResult = await pool.query(
+          `SELECT display_name FROM users WHERE id = $1`,
+          [user_id]
+        );
+        const displayName = userResult.rows[0]?.display_name || 'Customer';
+        cardObjectId = await mintCardOnChain(displayName);
+
+        // Insert loyalty card with real on-chain object ID
+        await pool.query(
+          `INSERT INTO loyalty_cards (on_chain_card_id, user_id, brand_id, points_balance, scan_count, tier)
+           VALUES ($1, $2, $3, $4, 1, 0)`,
+          [cardObjectId, user_id, token.brand_id, pointsToAdd]
+        );
+      } else {
+        // Card exists — earn points on-chain
+        cardObjectId = existingCard.rows[0].on_chain_card_id;
+        txDigest = await earnPointsOnChain(cardObjectId, pointsToAdd);
+
+        // Update DB points + tier
+        await pool.query(
+          `UPDATE loyalty_cards
+           SET points_balance = points_balance + $1,
+               scan_count     = scan_count + 1,
+               tier = CASE
+                 WHEN points_balance + $1 >= 500 THEN 2
+                 WHEN points_balance + $1 >= 100 THEN 1
+                 ELSE 0
+               END
+           WHERE user_id = $2 AND brand_id = $3`,
+          [pointsToAdd, user_id, token.brand_id]
+        );
+      }
+    }
+
+    // Return token enriched with brand info
     const fullResult = await pool.query(
       `SELECT qt.*, b.name as brand_name, b.color as brand_color, b.category as brand_category
        FROM qr_tokens qt
@@ -64,9 +96,9 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
       [token.id]
     );
 
-    return fullResult.rows[0];
+    return { ...fullResult.rows[0], tx_digest: txDigest };
   } catch (err) {
-    await client.query('ROLLBACK');
+    try { await client.query('ROLLBACK'); } catch {}
     throw err;
   } finally {
     client.release();
