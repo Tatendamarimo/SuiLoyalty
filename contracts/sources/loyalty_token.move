@@ -3,6 +3,7 @@ module sui_loyalty::loyalty_token {
 
     public struct LOYALTY_TOKEN has drop {}
 
+    #[allow(deprecated_usage)]
     fun init(witness: LOYALTY_TOKEN, ctx: &mut TxContext) {
         let (treasury_cap, metadata) = coin::create_currency(
             witness,

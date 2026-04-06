@@ -9,7 +9,7 @@ export default function Home() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("http://localhost:3000/api/auth/zklogin", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/zklogin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });

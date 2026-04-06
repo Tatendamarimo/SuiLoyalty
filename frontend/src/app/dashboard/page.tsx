@@ -102,7 +102,7 @@ function DashboardContent() {
     if (storedName) {
       setName(storedName);
     } else if (addr) {
-      fetch(`http://localhost:3000/api/user/${addr}`)
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/${addr}`)
         .then(r => r.json())
         .then(data => {
           if (data.success && data.user.display_name) {
@@ -116,7 +116,7 @@ function DashboardContent() {
 
   useEffect(() => {
     if (!address) return;
-    fetch(`http://localhost:3000/api/loyalty-cards/${address}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/loyalty-cards/${address}`)
       .then(r => r.json())
       .then(data => { setCards(data.cards || []); setLoading(false); })
       .catch(() => setLoading(false));
