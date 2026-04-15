@@ -3,10 +3,10 @@
 # This file SHOULD be committed to source control
 
 [published.devnet]
-chain-id = "f754f647"
-published-at = "0xb9976b2b4b1fdbdfd557dcfaf1f8802aa97ca9d51a23e9243963f652dd33508a"
-original-id = "0xb9976b2b4b1fdbdfd557dcfaf1f8802aa97ca9d51a23e9243963f652dd33508a"
+chain-id = "8e04bdd1"
+published-at = "0x71f7f4368cce7e50759d2f3055262612472ebe48b7bec077711afa6ff03830c5"
+original-id = "0x71f7f4368cce7e50759d2f3055262612472ebe48b7bec077711afa6ff03830c5"
 version = 1
 toolchain-version = "1.66.2"
 build-config = { flavor = "sui", edition = "2024" }
-upgrade-capability = "0x791dd46ec50b73eb5c14ad332f7adbc61a1a15d6fcea9b019ceab689b9037bee"
+upgrade-capability = "0x3165cf308600bc8e257919f56a543682af7273061a85fa50d5f00018aaa92638"

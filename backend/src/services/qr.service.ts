@@ -1,7 +1,15 @@
 import { randomUUID } from 'crypto';
 import pool from '../config/database.js';
-import { mintCardOnChain, earnPointsOnChain } from './blockchain.service.js';
+import { mintAvatarOnChain, addBrandToAvatarOnChain, addBrandPointsOnChain } from './blockchain.service.js';
 
+/**
+ * Generates a new unique QR token to be scanned by a user.
+ * Tokens are stored in the database and can optionally be tied to a specific brand or points value.
+ *
+ * @param brand_id - (Optional) The UUID of the brand issuing the QR code.
+ * @param points_value - (Optional) The number of points this scan will award (defaults to 10).
+ * @returns The newly created QR token record.
+ */
 export async function generateQRToken(brand_id?: string, points_value?: number) {
   const token_uuid = randomUUID();
 
@@ -15,12 +23,27 @@ export async function generateQRToken(brand_id?: string, points_value?: number) 
   return result.rows[0];
 }
 
+/**
+ * Validates a scanned QR token. If valid, marks it as used and awards loyalty points to the user.
+ *
+ * Flow:
+ * 1. Atomically marks the QR token as used (prevents double-spend).
+ * 2. Checks if the user has a LoyaltyAvatar — mints one on-chain if not.
+ * 3. Checks if the user's avatar has a BrandNode for this brand — creates one if not.
+ * 4. Calls add_brand_points on-chain to award points to that brand node.
+ * 5. Updates the database to mirror the on-chain state.
+ *
+ * @param token_uuid - The unique UUID of the scanned QR token.
+ * @param user_id - The internal DB user ID of the person scanning the code.
+ * @returns An object containing the token details, enriched brand info, and the blockchain tx digest.
+ * @throws Error if the token is invalid, already used, or expired.
+ */
 export async function validateQRToken(token_uuid: string, user_id: string) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
-    // 1. Atomically mark QR as used
+    // 1. Atomically mark QR as used to prevent double-spend
     const tokenResult = await client.query(
       `UPDATE qr_tokens
        SET used = TRUE, used_by = $2, used_at = NOW()
@@ -43,47 +66,92 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
     let txDigest: string | null = null;
 
     if (token.brand_id) {
-      // 2. Check whether this user already has a card for this brand
-      const existingCard = await pool.query(
-        `SELECT on_chain_card_id FROM loyalty_cards WHERE user_id = $1 AND brand_id = $2`,
-        [user_id, token.brand_id]
+      // 2. Look up brand name for the brand ID
+      const brandResult = await pool.query(
+        `SELECT name FROM brands WHERE id = $1`,
+        [token.brand_id]
+      );
+      const brandName: string = brandResult.rows[0]?.name || 'Unknown Brand';
+
+      // 3. Check if user has a LoyaltyAvatar
+      const existingAvatar = await pool.query(
+        `SELECT on_chain_avatar_id FROM loyalty_avatars WHERE user_id = $1`,
+        [user_id]
       );
 
-      let cardObjectId: string;
+      let avatarObjectId: string;
 
-      if (existingCard.rows.length === 0) {
-        // No card yet — mint one on-chain (card goes to backend wallet)
+      if (existingAvatar.rows.length === 0) {
+        // No avatar yet — mint one on-chain
         const userResult = await pool.query(
-          `SELECT display_name FROM users WHERE id = $1`,
+          `SELECT display_name, wallet_address FROM users WHERE id = $1`,
           [user_id]
         );
         const displayName = userResult.rows[0]?.display_name || 'Customer';
-        cardObjectId = await mintCardOnChain(displayName);
+        const walletAddress = userResult.rows[0]?.wallet_address;
 
-        // Insert loyalty card with real on-chain object ID
+        if (!walletAddress) {
+          throw new Error('Unable to mint avatar: User has no wallet address');
+        }
+
+        avatarObjectId = await mintAvatarOnChain(displayName, walletAddress);
+
+        // Record the avatar in the database
         await pool.query(
-          `INSERT INTO loyalty_cards (on_chain_card_id, user_id, brand_id, points_balance, scan_count, tier)
+          `INSERT INTO loyalty_avatars (on_chain_avatar_id, user_id)
+           VALUES ($1, $2)`,
+          [avatarObjectId, user_id]
+        );
+
+        // Add the brand node to the new avatar
+        await addBrandToAvatarOnChain(avatarObjectId, brandName);
+
+        // Record the brand relationship
+        await pool.query(
+          `INSERT INTO loyalty_brand_nodes (user_id, brand_id, brand_name, points_balance, scan_count, tier)
            VALUES ($1, $2, $3, $4, 1, 0)`,
-          [cardObjectId, user_id, token.brand_id, pointsToAdd]
+          [user_id, token.brand_id, brandName, pointsToAdd]
         );
-      } else {
-        // Card exists — earn points on-chain
-        cardObjectId = existingCard.rows[0].on_chain_card_id;
-        txDigest = await earnPointsOnChain(cardObjectId, pointsToAdd);
 
-        // Update DB points + tier
-        await pool.query(
-          `UPDATE loyalty_cards
-           SET points_balance = points_balance + $1,
-               scan_count     = scan_count + 1,
-               tier = CASE
-                 WHEN points_balance + $1 >= 500 THEN 2
-                 WHEN points_balance + $1 >= 100 THEN 1
-                 ELSE 0
-               END
-           WHERE user_id = $2 AND brand_id = $3`,
-          [pointsToAdd, user_id, token.brand_id]
+        // Award initial points to the brand node
+        txDigest = await addBrandPointsOnChain(avatarObjectId, brandName, pointsToAdd);
+
+      } else {
+        // Avatar exists — check if brand node exists
+        avatarObjectId = existingAvatar.rows[0].on_chain_avatar_id;
+
+        const existingBrandNode = await pool.query(
+          `SELECT id FROM loyalty_brand_nodes WHERE user_id = $1 AND brand_id = $2`,
+          [user_id, token.brand_id]
         );
+
+        if (existingBrandNode.rows.length === 0) {
+          // Brand node doesn't exist yet — add it on-chain first
+          await addBrandToAvatarOnChain(avatarObjectId, brandName);
+
+          await pool.query(
+            `INSERT INTO loyalty_brand_nodes (user_id, brand_id, brand_name, points_balance, scan_count, tier)
+             VALUES ($1, $2, $3, $4, 1, 0)`,
+            [user_id, token.brand_id, brandName, pointsToAdd]
+          );
+        } else {
+          // Brand node exists — just update points
+          await pool.query(
+            `UPDATE loyalty_brand_nodes
+             SET points_balance = points_balance + $1,
+                 scan_count     = scan_count + 1,
+                 tier = CASE
+                   WHEN points_balance + $1 >= 500 THEN 2
+                   WHEN points_balance + $1 >= 100 THEN 1
+                   ELSE 0
+                 END
+             WHERE user_id = $2 AND brand_id = $3`,
+            [pointsToAdd, user_id, token.brand_id]
+          );
+        }
+
+        // Award points on-chain for the brand
+        txDigest = await addBrandPointsOnChain(avatarObjectId, brandName, pointsToAdd);
       }
     }
 

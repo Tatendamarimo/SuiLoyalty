@@ -23,7 +23,7 @@ export default function Merchant() {
   const [qrLoaded, setQrLoaded] = useState(false);
 
   useEffect(() => {
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/brands`)
+    fetch(`/api/brands`)
       .then(r => r.json())
       .then(data => setBrands(data.brands || []));
 
@@ -38,7 +38,7 @@ export default function Merchant() {
     setLoading(true);
     setTokens([]);
 
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/qr/clear-unprinted`, {
+    await fetch(`/api/qr/clear-unprinted`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ brand_id: selectedBrand.id }),
@@ -46,7 +46,7 @@ export default function Merchant() {
 
     const results: QRToken[] = [];
     for (let i = 0; i < quantity; i++) {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/qr/generate`, {
+      const res = await fetch(`/api/qr/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ brand_id: selectedBrand.id, points_value: pointsPerScan }),
@@ -87,7 +87,7 @@ export default function Merchant() {
       a.download = `${selectedBrand?.name}_qr_${i + 1}.png`;
       a.click();
     });
-    await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/qr/mark-printed`, {
+    await fetch(`/api/qr/mark-printed`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token_uuids: tokens.map(t => t.token_uuid) }),

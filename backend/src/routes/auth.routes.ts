@@ -9,6 +9,10 @@ dotenv.config();
 const router = Router();
 const suiClient = new SuiClient({ url: getFullnodeUrl('devnet') });
 
+/**
+ * @route POST /api/auth/zklogin
+ * @description Generates the URL and parameters needed to initiate a zkLogin flow via Google OAuth.
+ */
 router.post('/zklogin', async (req: Request, res: Response) => {
   try {
     const { epoch } = await suiClient.getLatestSuiSystemState();
@@ -37,6 +41,10 @@ router.post('/zklogin', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * @route GET /api/auth/session
+ * @description Placeholder endpoint for retrieving the current session data.
+ */
 router.get('/session', (req: Request, res: Response) => {
   res.json({ authenticated: false, message: 'Session management coming in Sprint 3' });
 });

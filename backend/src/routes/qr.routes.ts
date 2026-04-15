@@ -4,6 +4,10 @@ import { generateQRToken, validateQRToken } from '../services/qr.service.js';
 
 const router = Router();
 
+/**
+ * @route POST /api/qr/generate
+ * @description Creates a new QR token. Used primarily by merchants to generate a scannable token.
+ */
 router.post('/generate', async (req: Request, res: Response) => {
   try {
     const token = await generateQRToken();
@@ -13,7 +17,11 @@ router.post('/generate', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/validate', async (req: Request, res: Response) => {
+/**
+ * @route POST /api/qr/validate
+ * @description Validates a scanned QR token and updates points or mints a card.
+ */
+router.post('/validate', async (req, res) => {
   try {
     const { token_uuid, user_id } = req.body;
 

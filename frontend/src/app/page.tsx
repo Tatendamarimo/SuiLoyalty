@@ -1,20 +1,51 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
+
+  // Handle OAuth callback — check for ?code= in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    if (!code) return;
+
+    window.history.replaceState({}, "", "/");
+    setLoading(true);
+
+    fetch("/api/auth/callback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ code }),
+    })
+      .then(async (r) => {
+        const data = await r.json();
+        if (data.user) {
+          localStorage.setItem("sui_address", data.user.suiAddress);
+          router.push("/dashboard");
+        } else {
+          setError(data.error || "Authentication failed. Please try again.");
+        }
+      })
+      .catch((e) => setError(`Network error: ${e.message}`))
+      .finally(() => setLoading(false));
+  }, [router]);
 
   async function handleSignIn() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/zklogin`, {
+      const res = await fetch(`/api/auth/zklogin`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ returnUrl: window.location.origin }),
       });
       const data = await res.json();
-      if (data.success && data.authUrl) {
+      if (data.authUrl) {
         localStorage.setItem("zklogin_ephemeral", JSON.stringify({
           ephemeralPublicKey: data.ephemeralPublicKey,
           maxEpoch: data.maxEpoch,

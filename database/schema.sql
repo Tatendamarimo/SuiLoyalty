@@ -7,6 +7,7 @@ CREATE TABLE users (
     wallet_address VARCHAR(66) NOT NULL UNIQUE,
     email VARCHAR(255),
     display_name VARCHAR(100),
+    avatar_object_id VARCHAR(66) UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -31,25 +32,32 @@ CREATE TABLE qr_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE loyalty_cards (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    on_chain_card_id VARCHAR(66) NOT NULL UNIQUE,
-    user_id UUID NOT NULL REFERENCES users(id),
-    brand_id UUID NOT NULL REFERENCES brands(id),
-    points_balance BIGINT NOT NULL DEFAULT 0,
-    tier SMALLINT NOT NULL DEFAULT 0,
-    scan_count BIGINT NOT NULL DEFAULT 0,
-    last_synced_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (user_id, brand_id)
+CREATE TABLE loyalty_avatars (
+    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    on_chain_avatar_id  VARCHAR(66) NOT NULL UNIQUE,  -- Sui object ID of the LoyaltyAvatar NFT
+    user_id             UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id)    -- One avatar per user
+);
+
+CREATE TABLE loyalty_brand_nodes (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id         UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    brand_id        UUID NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+    brand_name      TEXT NOT NULL,               -- Cached brand name for quick display
+    points_balance  BIGINT NOT NULL DEFAULT 0,
+    scan_count      BIGINT NOT NULL DEFAULT 0,
+    tier            SMALLINT NOT NULL DEFAULT 0, -- 0=Bronze, 1=Silver, 2=Gold
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, brand_id)                   -- One node per user per brand
 );
 
 CREATE TABLE point_transactions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    card_id UUID NOT NULL REFERENCES loyalty_cards(id),
-    points_added BIGINT NOT NULL,
-    sui_tx_digest VARCHAR(90) UNIQUE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    node_id         UUID NOT NULL REFERENCES loyalty_brand_nodes(id) ON DELETE CASCADE,
+    points_added    BIGINT NOT NULL,
+    sui_tx_digest   VARCHAR(90) UNIQUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE blockchain_events (

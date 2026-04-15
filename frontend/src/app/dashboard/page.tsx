@@ -87,6 +87,7 @@ function DashboardContent() {
   const [address, setAddress] = useState("");
   const [name, setName] = useState("Customer");
   const [cards, setCards] = useState<BrandCard[]>([]);
+  const [avatar, setAvatar] = useState<{ level: number; experience: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -102,7 +103,7 @@ function DashboardContent() {
     if (storedName) {
       setName(storedName);
     } else if (addr) {
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/user/${addr}`)
+      fetch(`/api/user/${addr}`)
         .then(r => r.json())
         .then(data => {
           if (data.success && data.user.display_name) {
@@ -116,10 +117,15 @@ function DashboardContent() {
 
   useEffect(() => {
     if (!address) return;
-    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/loyalty-cards/${address}`)
+    fetch(`/api/loyalty-cards/${address}`)
       .then(r => r.json())
       .then(data => { setCards(data.cards || []); setLoading(false); })
       .catch(() => setLoading(false));
+
+    fetch(`/api/nft/${address}`)
+      .then(r => r.json())
+      .then(data => { if (data.success && data.avatar) setAvatar(data.avatar); })
+      .catch(() => {});
   }, [address]);
 
   const totalPoints = cards.reduce((sum, c) => sum + c.points_balance, 0);
@@ -162,11 +168,12 @@ function DashboardContent() {
         </div>
 
         {/* Summary stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "24px" }}>
           {[
+            { label: "Avatar Level", value: loading ? "—" : (avatar ? `Lvl ${avatar.level}` : "Lvl 1") },
+            { label: "Experience", value: loading ? "—" : (avatar ? `${avatar.experience} XP` : "0 XP") },
             { label: "Total Points", value: loading ? "—" : totalPoints.toLocaleString() },
-            { label: "Brands", value: loading ? "—" : cards.length },
-            { label: "Scans", value: loading ? "—" : totalScans },
+            { label: "Brands Connected", value: loading ? "—" : cards.length },
           ].map(({ label, value }) => (
             <div key={label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "14px 12px", textAlign: "center" }}>
               <div style={{ fontSize: "18px", fontWeight: "700", color: "#e2e8f0" }}>{value}</div>

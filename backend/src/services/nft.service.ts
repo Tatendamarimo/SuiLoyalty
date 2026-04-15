@@ -2,24 +2,32 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 import pool from '../config/database.js';
-import { getCardByObjectId } from './blockchain.service.js';
+import { getAvatarByObjectId } from './blockchain.service.js';
 
 /**
- * Looks up the customer's highest-value LoyaltyCard objectId from the DB,
- * then fetches its live on-chain state. Cards are backend-custodied (owned by backend wallet).
+ * Looks up the user's LoyaltyAvatar objectId from the database using their wallet address,
+ * then fetches its live on-chain state (level, experience, locked status).
+ * Returns null if the user has no avatar registered.
+ *
+ * @param walletAddress - The Sui wallet address of the user.
  */
-export async function getLoyaltyCard(walletAddress: string) {
+export async function getLoyaltyAvatar(walletAddress: string) {
   const result = await pool.query(
-    `SELECT lc.on_chain_card_id
-     FROM loyalty_cards lc
-     JOIN users u ON u.id = lc.user_id
+    `SELECT la.on_chain_avatar_id
+     FROM loyalty_avatars la
+     JOIN users u ON u.id = la.user_id
      WHERE u.wallet_address = $1
-     ORDER BY lc.points_balance DESC
      LIMIT 1`,
     [walletAddress]
   );
 
   if (result.rows.length === 0) return null;
 
-  return getCardByObjectId(result.rows[0].on_chain_card_id);
+  return getAvatarByObjectId(result.rows[0].on_chain_avatar_id);
 }
+
+/**
+ * @deprecated Use getLoyaltyAvatar instead.
+ * Legacy alias kept for backward compatibility.
+ */
+export const getLoyaltyCard = getLoyaltyAvatar;

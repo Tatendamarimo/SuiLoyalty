@@ -74,7 +74,7 @@ function ScanContent() {
         token_uuid = parsed.token_uuid || parsed.token || qrData;
       } catch { }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/qr/validate`, {
+      const res = await fetch(`/api/qr/validate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token_uuid, user_id: address }),

@@ -6,20 +6,26 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { generateQRToken, validateQRToken } from './services/qr.service.js';
 import { generateEphemeralKeypair, deriveSalt, computeSuiAddress } from './services/zklogin.service.js';
-import { getLoyaltyCard } from './services/nft.service.js';
+import { getLoyaltyAvatar } from './services/nft.service.js';
 import pool from './config/database.js';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({ origin: '*' })); // Allow all origins for local testing
 app.use(express.json());
 
+/**
+ * Basic health check endpoint to verify backend service is running.
+ */
 app.get('/api/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
 });
 
+/**
+ * Retrieves the full list of brands available in the system.
+ */
 app.get('/api/brands', async (_req, res) => {
   try {
     const result = await pool.query('SELECT * FROM brands ORDER BY name');
@@ -29,6 +35,10 @@ app.get('/api/brands', async (_req, res) => {
   }
 });
 
+/**
+ * Helper endpoint to mark one or more QR tokens as 'printed'.
+ * Expects an array of token_uuids in the request body.
+ */
 app.post('/api/qr/mark-printed', async (req, res) => {
   try {
     const { token_uuids } = req.body;
@@ -45,6 +55,10 @@ app.post('/api/qr/mark-printed', async (req, res) => {
   }
 });
 
+/**
+ * Clears unprinted QR tokens for a given brand to prevent database bloat.
+ * Expects a brand_id in the request body.
+ */
 app.post('/api/qr/clear-unprinted', async (req, res) => {
   try {
     const { brand_id } = req.body;
@@ -58,6 +72,10 @@ app.post('/api/qr/clear-unprinted', async (req, res) => {
   }
 });
 
+/**
+ * Generates a new QR token.
+ * Optionally accepts a brand_id and points_value to associate with the token.
+ */
 app.post('/api/qr/generate', async (req, res) => {
   try {
     const { brand_id, points_value } = req.body;
@@ -68,6 +86,10 @@ app.post('/api/qr/generate', async (req, res) => {
   }
 });
 
+/**
+ * Validates a scanned QR token and adds points/mints a card for the user.
+ * Expects token_uuid (scanned from QR) and user_id (who scanned it).
+ */
 app.post('/api/qr/validate', async (req, res) => {
   try {
     const { token_uuid, user_id } = req.body;
@@ -96,6 +118,10 @@ app.post('/api/qr/validate', async (req, res) => {
   }
 });
 
+/**
+ * Initiates the zkLogin OAuth flow by generating an ephemeral keypair
+ * and redirecting the user to the Google OAuth login page.
+ */
 app.post('/api/auth/zklogin', async (req, res) => {
   try {
     const { SuiJsonRpcClient, getJsonRpcFullnodeUrl } = await import('@mysten/sui/jsonRpc');
@@ -104,7 +130,7 @@ app.post('/api/auth/zklogin', async (req, res) => {
     const ephemeral = generateEphemeralKeypair(Number(epoch));
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,
-      redirect_uri: 'http://localhost:3000/api/auth/callback',
+      redirect_uri: `http://${req.get('host')}/api/auth/callback`,
       response_type: 'code',
       scope: 'openid email profile',
       nonce: ephemeral.nonce,
@@ -121,6 +147,11 @@ app.post('/api/auth/zklogin', async (req, res) => {
   }
 });
 
+/**
+ * Callback URL for the Google OAuth process.
+ * Handles the redirect logic, exchanges the auth code for a JWT,
+ * derives the user's Sui address, and inserts/updates the user record in the DB.
+ */
 app.get('/api/auth/callback', async (req, res) => {
   try {
     const { code } = req.query;
@@ -132,7 +163,7 @@ app.get('/api/auth/callback', async (req, res) => {
         code: code as string,
         client_id: process.env.GOOGLE_CLIENT_ID!,
         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri: 'http://localhost:3000/api/auth/callback',
+        redirect_uri: `http://${req.get('host')}/api/auth/callback`,
         grant_type: 'authorization_code',
       }),
     });
@@ -152,7 +183,8 @@ app.get('/api/auth/callback', async (req, res) => {
        SET email = $2, display_name = $3`,
       [suiAddress, email, name]
     );
-    res.redirect(`http://localhost:3001/dashboard?address=${suiAddress}&name=${encodeURIComponent(name)}`);
+    const hostname = req.hostname || 'localhost';
+    res.redirect(`http://${hostname}:3001/dashboard?address=${suiAddress}&name=${encodeURIComponent(name)}`);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
@@ -162,6 +194,9 @@ app.get('/api/auth/session', (req, res) => {
   res.json({ authenticated: false });
 });
 
+/**
+ * Retrieves basic user info directly from the database using their wallet address.
+ */
 app.get('/api/user/:address', async (req, res) => {
   try {
     const result = await pool.query(
@@ -177,27 +212,35 @@ app.get('/api/user/:address', async (req, res) => {
   }
 });
 
+/**
+ * Fetches the user's LoyaltyAvatar top-level data (level, experience, locked status)
+ * by looking up the on-chain avatar object tied to the user's wallet address.
+ */
 app.get('/api/nft/:address', async (req, res) => {
   try {
-    const card = await getLoyaltyCard(req.params.address);
-    if (!card) {
-      return res.status(404).json({ success: false, error: 'No loyalty card found' });
+    const avatar = await getLoyaltyAvatar(req.params.address);
+    if (!avatar) {
+      return res.status(404).json({ success: false, error: 'No loyalty avatar found' });
     }
-    res.json({ success: true, card });
+    res.json({ success: true, avatar });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
+/**
+ * Fetches all brand loyalty nodes for a user, grouped by brand.
+ * Each entry contains brand info, points balance, tier, and scan count.
+ */
 app.get('/api/loyalty-cards/:address', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT lc.points_balance, lc.tier, lc.scan_count, lc.created_at,
+      `SELECT lbn.points_balance, lbn.tier, lbn.scan_count, lbn.created_at,
               b.id as brand_id, b.name as brand_name, b.color as brand_color, b.category as brand_category
-       FROM loyalty_cards lc
-       JOIN brands b ON b.id = lc.brand_id
-       WHERE lc.user_id = (SELECT id FROM users WHERE wallet_address = $1)
-       ORDER BY lc.points_balance DESC`,
+       FROM loyalty_brand_nodes lbn
+       JOIN brands b ON b.id = lbn.brand_id
+       WHERE lbn.user_id = (SELECT id FROM users WHERE wallet_address = $1)
+       ORDER BY lbn.points_balance DESC`,
       [req.params.address]
     );
     res.json({ success: true, cards: result.rows });
@@ -206,7 +249,8 @@ app.get('/api/loyalty-cards/:address', async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`SuiLoyalty backend running on port ${PORT}`);
+app.listen(PORT as number, '0.0.0.0', () => {
+  console.log(`SuiLoyalty backend running on port ${PORT} (0.0.0.0)`);
+  console.log(`Your local IP is: 192.168.1.48 (use this on your phone!)`);
   console.log(`Google Client ID: ${process.env.GOOGLE_CLIENT_ID?.slice(0, 20)}...`);
 });
