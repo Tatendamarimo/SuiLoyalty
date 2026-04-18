@@ -130,7 +130,7 @@ app.post('/api/auth/zklogin', async (req, res) => {
     const ephemeral = generateEphemeralKeypair(Number(epoch));
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,
-      redirect_uri: `http://${req.get('host')}/api/auth/callback`,
+      redirect_uri: process.env.REDIRECT_URI!,
       response_type: 'code',
       scope: 'openid email profile',
       nonce: ephemeral.nonce,
@@ -163,7 +163,7 @@ app.get('/api/auth/callback', async (req, res) => {
         code: code as string,
         client_id: process.env.GOOGLE_CLIENT_ID!,
         client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        redirect_uri: `http://${req.get('host')}/api/auth/callback`,
+        redirect_uri: process.env.REDIRECT_URI!,
         grant_type: 'authorization_code',
       }),
     });
