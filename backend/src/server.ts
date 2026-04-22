@@ -124,13 +124,18 @@ app.post('/api/qr/validate', async (req, res) => {
  */
 app.post('/api/auth/zklogin', async (req, res) => {
   try {
+    const { returnUrl } = req.body;
     const { SuiJsonRpcClient, getJsonRpcFullnodeUrl } = await import('@mysten/sui/jsonRpc');
-    const client = new SuiJsonRpcClient({ url: getJsonRpcFullnodeUrl('devnet'), network: 'devnet' });
+    const network = (process.env.SUI_NETWORK || 'testnet') as 'devnet' | 'testnet' | 'mainnet';
+    const client = new SuiJsonRpcClient({ url: getJsonRpcFullnodeUrl(network), network });
     const { epoch } = await client.getLatestSuiSystemState();
     const ephemeral = generateEphemeralKeypair(Number(epoch));
+
+    const redirectUri = process.env.REDIRECT_URI!;
+
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,
-      redirect_uri: process.env.REDIRECT_URI!,
+      redirect_uri: redirectUri,
       response_type: 'code',
       scope: 'openid email profile',
       nonce: ephemeral.nonce,
@@ -148,7 +153,62 @@ app.post('/api/auth/zklogin', async (req, res) => {
 });
 
 /**
- * Callback URL for the Google OAuth process.
+ * POST endpoint for OAuth callback - used by frontend to exchange code for user data
+ * The frontend sends the authorization code here after Google redirects back
+ */
+app.post('/api/auth/callback', async (req, res) => {
+  try {
+    const { code } = req.body;
+    if (!code) return res.status(400).json({ error: 'No code provided' });
+
+    // Use the frontend origin as redirect_uri (must match what was sent to Google)
+    const redirectUri = req.get('origin') || 'http://localhost:3001';
+
+    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        code: code as string,
+        client_id: process.env.GOOGLE_CLIENT_ID!,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+        redirect_uri: redirectUri,
+        grant_type: 'authorization_code',
+      }),
+    });
+
+    const tokenData = await tokenRes.json();
+    const jwt = tokenData.id_token;
+
+    if (!jwt) {
+      console.error('Token exchange failed:', tokenData);
+      return res.status(400).json({ error: 'No JWT received', details: tokenData });
+    }
+
+    const payload = JSON.parse(Buffer.from(jwt.split('.')[1], 'base64').toString());
+    const googleSub = payload.sub;
+    const email = payload.email;
+    const name = payload.name || email;
+
+    const salt = deriveSalt(googleSub);
+    const suiAddress = computeSuiAddress(jwt, salt);
+
+    await pool.query(
+      `INSERT INTO users (wallet_address, email, display_name)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (wallet_address) DO UPDATE
+       SET email = $2, display_name = $3`,
+      [suiAddress, email, name]
+    );
+
+    res.json({ success: true, user: { suiAddress, email, name } });
+  } catch (error: any) {
+    console.error('OAuth callback error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET endpoint for OAuth callback - for backwards compatibility
  * Handles the redirect logic, exchanges the auth code for a JWT,
  * derives the user's Sui address, and inserts/updates the user record in the DB.
  */
@@ -246,6 +306,82 @@ app.get('/api/loyalty-cards/:address', async (req, res) => {
     res.json({ success: true, cards: result.rows });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Fetches recent point transactions for a user across all brands.
+ */
+app.get('/api/transactions/:address', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT pt.id, pt.points_added, pt.created_at, b.name as brand_name, b.color as brand_color
+       FROM point_transactions pt
+       JOIN loyalty_brand_nodes lbn ON pt.node_id = lbn.id
+       JOIN brands b ON lbn.brand_id = b.id
+       WHERE lbn.user_id = (SELECT id FROM users WHERE wallet_address = $1)
+       ORDER BY pt.created_at DESC
+       LIMIT 50`,
+      [req.params.address]
+    );
+    res.json({ success: true, transactions: result.rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Off-chain endpoint to redeem points for a specific brand.
+ */
+app.post('/api/redeem', async (req, res) => {
+  try {
+    const { user_address, brand_id, points_to_redeem, reward_name } = req.body;
+    
+    if (!user_address || !brand_id || !points_to_redeem) {
+      return res.status(400).json({ success: false, error: 'Missing required fields' });
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      const nodeResult = await client.query(
+        `SELECT id, points_balance FROM loyalty_brand_nodes 
+         WHERE user_id = (SELECT id FROM users WHERE wallet_address = $1) 
+         AND brand_id = $2 FOR UPDATE`,
+        [user_address, brand_id]
+      );
+      
+      if (nodeResult.rows.length === 0) {
+        throw new Error('Loyalty card not found for this brand');
+      }
+      
+      const node = nodeResult.rows[0];
+      if (Number(node.points_balance) < Number(points_to_redeem)) {
+        throw new Error('Insufficient points');
+      }
+      
+      await client.query(
+        `UPDATE loyalty_brand_nodes SET points_balance = points_balance - $1 WHERE id = $2`,
+        [points_to_redeem, node.id]
+      );
+      
+      await client.query(
+        `INSERT INTO point_transactions (node_id, points_added, sui_tx_digest)
+         VALUES ($1, $2, $3)`,
+        [node.id, -points_to_redeem, `redeem-${Date.now()}`]
+      );
+      
+      await client.query('COMMIT');
+      res.json({ success: true, message: `Successfully redeemed ${points_to_redeem} points for ${reward_name || 'reward'}` });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
   }
 });
 

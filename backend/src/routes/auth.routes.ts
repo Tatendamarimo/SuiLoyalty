@@ -7,7 +7,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const router = Router();
-const suiClient = new SuiClient({ url: getFullnodeUrl('devnet') });
+const suiClient = new SuiClient({ url: getFullnodeUrl((process.env.SUI_NETWORK || 'testnet') as 'devnet' | 'testnet' | 'mainnet') });
 
 /**
  * @route POST /api/auth/zklogin
@@ -21,7 +21,7 @@ router.post('/zklogin', async (req: Request, res: Response) => {
 
     const params = new URLSearchParams({
       client_id: process.env.GOOGLE_CLIENT_ID!,
-      redirect_uri: 'http://localhost:3000/api/auth/callback',
+      redirect_uri: req.body.returnUrl || process.env.REDIRECT_URI!,
       response_type: 'code',
       scope: 'openid email profile',
       nonce: ephemeral.nonce,

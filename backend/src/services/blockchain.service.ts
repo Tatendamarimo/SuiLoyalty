@@ -8,7 +8,7 @@ import { decodeSuiPrivateKey } from '@mysten/sui/cryptography';
 
 const PACKAGE_ID = process.env.SUI_PACKAGE_ID!;
 const ADMIN_CAP_ID = process.env.ADMIN_CAP_ID!;
-const NETWORK = (process.env.SUI_NETWORK || 'devnet') as 'devnet' | 'testnet' | 'mainnet';
+const NETWORK = (process.env.SUI_NETWORK || 'testnet') as 'devnet' | 'testnet' | 'mainnet';
 
 /**
  * Decodes the base64/hex private key from environment variables

@@ -10,7 +10,8 @@ const router = Router();
  */
 router.post('/generate', async (req: Request, res: Response) => {
   try {
-    const token = await generateQRToken();
+    const { brand_id, points_value } = req.body;
+    const token = await generateQRToken(brand_id, points_value);
     res.status(201).json({ success: true, token });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to generate token' });

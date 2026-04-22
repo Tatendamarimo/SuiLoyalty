@@ -5,5 +5,3 @@ authors = ["Tatenda Marimo"]
 
 [dependencies]
 
-[environments]
-devnet = "8e04bdd1"

@@ -1,6 +1,6 @@
 # SuiLoyalty Architecture Migration Summary
 **Date:** April 2026
-**Author:** AI Assistant / Tatenda Marimo
+**Author:** Tatenda Marimo
 
 ## Executive Summary
 This document outlines the architectural migration of the SuiLoyalty platform from a basic, single-owner `LoyaltyCard` model to a scalable, highly secure **Shared Object + AdminCap** architecture, utilizing Dynamic NFT Avatars. 

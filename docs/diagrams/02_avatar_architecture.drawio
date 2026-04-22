@@ -1,0 +1,82 @@
+<mxfile host="app.diagrams.net" modified="2026-04-22T00:00:00.000Z" agent="Claude" version="24.0.0">
+  <diagram name="Avatar + BrandNode" id="avatar-arch">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="800" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Customer -->
+        <mxCell id="cust" value="&lt;b&gt;Customer&lt;/b&gt;&lt;br/&gt;&lt;font color=&quot;#555&quot; size=&quot;11&quot;&gt;zkLogin authenticated&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1DAF7;strokeColor=#6B4FBB;fontSize=13;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="450" y="40" width="220" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- LoyaltyAvatar NFT (shared object) -->
+        <mxCell id="avatar" value="&lt;b&gt;LoyaltyAvatar (NFT)&lt;/b&gt;&lt;br/&gt;&lt;font color=&quot;#555&quot; size=&quot;11&quot;&gt;Sui shared object · one per customer&lt;br/&gt;level · experience · attributes · brand_count&lt;br/&gt;&lt;i&gt;mutated only via &amp;AdminCap&lt;/i&gt;&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CDE3F5;strokeColor=#4A7BB5;fontSize=13;verticalAlign=middle;align=center;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="380" y="160" width="360" height="90" as="geometry" />
+        </mxCell>
+
+        <!-- BrandNodes row -->
+        <mxCell id="bn-sb" value="&lt;b&gt;BrandNode: Starbucks&lt;/b&gt;&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;150 pts — Silver&lt;br/&gt;7 scans&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="60" y="330" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="bn-nk" value="&lt;b&gt;BrandNode: Nike&lt;/b&gt;&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;50 pts — Bronze&lt;br/&gt;3 scans&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8E8E8;strokeColor=#6C6C6C;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="300" y="330" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="bn-am" value="&lt;b&gt;BrandNode: Amazon&lt;/b&gt;&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;520 pts — Gold&lt;br/&gt;24 scans&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="540" y="330" width="210" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="bn-em" value="&lt;b&gt;BrandNode: Emirates&lt;/b&gt;&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;80 pts — Bronze&lt;br/&gt;5 scans&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="780" y="330" width="210" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- Dynamic Object Field note -->
+        <mxCell id="dof" value="&lt;i&gt;Dynamic Object Fields attached to the Avatar — keyed by brand name&lt;/i&gt;" style="text;html=1;align=center;fontSize=11;fontStyle=2;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="60" y="415" width="930" height="20" as="geometry" />
+        </mxCell>
+
+        <!-- Mirror — DB tables -->
+        <mxCell id="db-avatar" value="&lt;b&gt;loyalty_avatars&lt;/b&gt;&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;UNIQUE(user_id) — one row per customer&lt;br/&gt;on_chain_avatar_id → Sui object id&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5DCC1;strokeColor=#C38C4B;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="140" y="490" width="340" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="db-nodes" value="&lt;b&gt;loyalty_brand_nodes&lt;/b&gt;&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;UNIQUE(user_id, brand_id) — one row per (user, brand)&lt;br/&gt;points_balance · scan_count · tier · brand_name&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5DCC1;strokeColor=#C38C4B;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="560" y="490" width="400" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Backend orchestrator -->
+        <mxCell id="backend-orch" value="&lt;b&gt;Node.js backend&lt;/b&gt; — orchestrator&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;holds AdminCap · calls add_brand / add_brand_points&lt;br/&gt;upserts mirrors in PostgreSQL within same request&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CDE8DA;strokeColor=#4C9D7C;fontSize=12;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="300" y="620" width="500" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- Edges -->
+        <mxCell id="e-cust-av" value="owns" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="cust" target="avatar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-av-sb" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;" edge="1" parent="1" source="avatar" target="bn-sb">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-av-nk" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;" edge="1" parent="1" source="avatar" target="bn-nk">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-av-am" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;" edge="1" parent="1" source="avatar" target="bn-am">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-av-em" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;" edge="1" parent="1" source="avatar" target="bn-em">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-av-db" value="mirrors (1:1)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;startArrow=classic;endFill=1;startFill=1;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="avatar" target="db-avatar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-bns-db" value="mirrors (1:N)" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;startArrow=classic;endFill=1;startFill=1;dashed=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="bn-am" target="db-nodes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-av" value="&amp;AdminCap PTB" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.25;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="backend-orch" target="avatar">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-be-db" value="SQL upsert" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.75;exitY=0;exitDx=0;exitDy=0;" edge="1" parent="1" source="backend-orch" target="db-nodes">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

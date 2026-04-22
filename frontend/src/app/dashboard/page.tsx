@@ -1,6 +1,53 @@
 "use client";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useRef, useCallback } from "react";
+
+// ─── Toast System ────────────────────────────────────────────────────────────
+type Toast = { id: number; message: string; type: "success" | "error" };
+
+function ToastContainer({ toasts, onDismiss }: { toasts: Toast[]; onDismiss: (id: number) => void }) {
+  return (
+    <div style={{ position: "fixed", bottom: "24px", right: "24px", zIndex: 9999, display: "flex", flexDirection: "column", gap: "10px", pointerEvents: "none" }}>
+      <style>{`
+        @keyframes toastIn {
+          from { opacity: 0; transform: translateY(20px) scale(0.95); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          onClick={() => onDismiss(t.id)}
+          style={{
+            pointerEvents: "all",
+            animation: "toastIn 0.35s cubic-bezier(0.4,0,0.2,1) both",
+            background: t.type === "success"
+              ? "linear-gradient(135deg, rgba(16,185,129,0.15), rgba(16,185,129,0.05))"
+              : "linear-gradient(135deg, rgba(239,68,68,0.15), rgba(239,68,68,0.05))",
+            backdropFilter: "blur(20px)",
+            border: `1px solid ${t.type === "success" ? "rgba(16,185,129,0.4)" : "rgba(239,68,68,0.4)"}`,
+            borderRadius: "14px",
+            padding: "14px 18px",
+            color: t.type === "success" ? "#6ee7b7" : "#fca5a5",
+            fontSize: "14px",
+            fontWeight: "600",
+            maxWidth: "340px",
+            cursor: "pointer",
+            boxShadow: t.type === "success"
+              ? "0 8px 32px rgba(16,185,129,0.2)"
+              : "0 8px 32px rgba(239,68,68,0.2)",
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+          }}
+        >
+          <span style={{ fontSize: "18px" }}>{t.type === "success" ? "✓" : "✕"}</span>
+          {t.message}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 type BrandCard = {
   brand_id: string;
@@ -20,63 +67,146 @@ function tierGradient(t: number) {
     "linear-gradient(135deg, #FFD700, #B8860B)",
   ][t] || "linear-gradient(135deg, #CD7F32, #8B4513)";
 }
-function nextTierPts(t: number) { return t >= 1 ? 500 : 100; }
-function progress(pts: number, t: number) { return t >= 2 ? 100 : Math.min(100, (pts / nextTierPts(t)) * 100); }
+function nextTierPts(t: number) { return (t + 1) * 500; } // matches contract: tier = points / 500
+function progress(pts: number, t: number) { if (t >= 2) return 100; const tierStart = t * 500; return Math.min(100, ((pts - tierStart) / 500) * 100); }
 
-function BrandCardUI({ card }: { card: BrandCard }) {
-  const pts = card.points_balance;
-  const t = card.tier;
+function BrandCardUI({ card, index, onRedeem }: { card: BrandCard; index: number, onRedeem: (c: BrandCard) => void }) {
+  const pts = Number(card.points_balance || 0);
+  const t = Number(card.tier || 0);
   const color = card.brand_color || "#6366f1";
+  const [isHovered, setIsHovered] = useState(false);
 
   return (
-    <div style={{
-      background: "rgba(255,255,255,0.03)",
-      border: `1px solid ${color}33`,
-      borderRadius: "16px",
-      padding: "20px",
-      marginBottom: "12px",
-      position: "relative",
-      overflow: "hidden",
-    }}>
-      <div style={{ position: "absolute", top: "-30px", right: "-30px", width: "90px", height: "90px", borderRadius: "50%", background: `${color}18`, pointerEvents: "none" }} />
+    <div
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        background: `linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)`,
+        backdropFilter: "blur(20px)",
+        border: `1px solid ${color}${isHovered ? '66' : '33'}`,
+        borderRadius: "20px",
+        padding: "24px",
+        marginBottom: "16px",
+        position: "relative",
+        overflow: "hidden",
+        transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: isHovered ? "translateY(-4px) scale(1.02)" : "translateY(0) scale(1)",
+        boxShadow: isHovered
+          ? `0 20px 60px -10px ${color}40, 0 0 0 1px ${color}20 inset`
+          : `0 8px 30px -8px rgba(0,0,0,0.3)`,
+        animation: `slideInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${index * 0.1}s both`,
+      }}>
+
+      <style>{`
+        @keyframes slideInUp {
+          from { opacity: 0; transform: translateY(30px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+
+      {/* Animated gradient orb */}
+      <div style={{
+        position: "absolute", top: "-40px", right: "-40px", width: "120px", height: "120px",
+        borderRadius: "50%", background: `radial-gradient(circle, ${color}30 0%, ${color}10 50%, transparent 70%)`,
+        pointerEvents: "none", transition: "all 0.3s ease",
+        transform: isHovered ? "scale(1.3)" : "scale(1)", opacity: isHovered ? 1 : 0.6,
+      }} />
+
+      {/* Shimmer effect on hover */}
+      {isHovered && (
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, bottom: 0,
+          background: `linear-gradient(90deg, transparent, ${color}20, transparent)`,
+          animation: "shimmer 2s infinite", pointerEvents: "none",
+        }} />
+      )}
 
       {/* Brand header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: `${color}22`, border: `1px solid ${color}44`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: "14px", fontWeight: "800", color }}>{card.brand_name[0]}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px", position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{
+            width: "44px", height: "44px", borderRadius: "12px",
+            background: `linear-gradient(135deg, ${color}30, ${color}15)`,
+            border: `1px solid ${color}50`, display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 4px 16px ${color}30`, transition: "all 0.3s ease",
+            transform: isHovered ? "scale(1.1) rotate(5deg)" : "scale(1)",
+          }}>
+            <span style={{ fontSize: "18px", fontWeight: "900", color, filter: "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" }}>
+              {card.brand_name[0]}
+            </span>
           </div>
           <div>
-            <div style={{ fontSize: "14px", fontWeight: "700", color: "#e2e8f0" }}>{card.brand_name}</div>
-            <div style={{ fontSize: "11px", color: "#64748b" }}>{card.brand_category}</div>
+            <div style={{ fontSize: "16px", fontWeight: "700", color: "#e2e8f0", letterSpacing: "0.3px" }}>{card.brand_name}</div>
+            <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "2px" }}>{card.brand_category}</div>
           </div>
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: "11px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.4px" }}>Tier</div>
-          <div style={{ fontSize: "13px", fontWeight: "700", background: tierGradient(t), WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{tierName(t)}</div>
+        <div style={{ textAlign: "right", background: `linear-gradient(135deg, ${color}15, transparent)`, padding: "8px 14px", borderRadius: "10px", border: `1px solid ${color}30` }}>
+          <div style={{ fontSize: "10px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: "2px" }}>Tier</div>
+          <div style={{ fontSize: "14px", fontWeight: "800", background: tierGradient(t), WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.3))" }}>
+            {tierName(t)}
+          </div>
         </div>
       </div>
 
       {/* Points */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "12px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: "16px", position: "relative", zIndex: 1 }}>
         <div>
-          <div style={{ fontSize: "11px", color: "#64748b", marginBottom: "2px" }}>Points</div>
-          <div style={{ fontSize: "32px", fontWeight: "800", color, lineHeight: 1 }}>{pts.toLocaleString()}</div>
+          <div style={{ fontSize: "11px", color: "#94a3b8", marginBottom: "4px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Points Balance</div>
+          <div style={{ fontSize: "40px", fontWeight: "900", background: `linear-gradient(135deg, ${color}, ${color}CC)`, WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", lineHeight: 1, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.3))", transition: "all 0.3s ease", transform: isHovered ? "scale(1.05)" : "scale(1)" }}>
+            {pts.toLocaleString()}
+          </div>
         </div>
-        <div style={{ fontSize: "11px", color: "#64748b" }}>{card.scan_count} scan{card.scan_count !== 1 ? "s" : ""}</div>
+        <button
+          onClick={(e) => { e.stopPropagation(); onRedeem(card); }}
+          style={{
+            background: "rgba(255,255,255,0.05)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: "8px",
+            padding: "8px 16px",
+            color: "white",
+            fontSize: "12px",
+            fontWeight: "600",
+            cursor: "pointer",
+            transition: "all 0.2s"
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.15)"}
+          onMouseLeave={(e) => e.currentTarget.style.background = "rgba(255,255,255,0.05)"}
+        >
+          Redeem
+        </button>
       </div>
 
       {/* Progress bar */}
-      <div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-          <span style={{ fontSize: "10px", color: "#64748b" }}>
-            {t >= 2 ? "Max tier" : `${nextTierPts(t) - pts} pts to ${t >= 1 ? "Gold" : "Silver"}`}
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+          <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "600" }}>
+            {t >= 2 ? "Max tier reached" : `${nextTierPts(t) - pts} pts to ${t >= 1 ? "Gold" : "Silver"}`}
           </span>
-          <span style={{ fontSize: "10px", color: "#64748b" }}>{Math.round(progress(pts, t))}%</span>
+          <span style={{ fontSize: "11px", color: color, fontWeight: "700" }}>{Math.round(progress(pts, t))}%</span>
         </div>
-        <div style={{ height: "4px", background: "rgba(255,255,255,0.06)", borderRadius: "2px", overflow: "hidden" }}>
-          <div style={{ height: "100%", borderRadius: "2px", background: color, width: `${progress(pts, t)}%`, transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)" }} />
+        <div style={{ height: "6px", background: "rgba(255,255,255,0.08)", borderRadius: "4px", overflow: "hidden", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.3)" }}>
+          <div style={{ height: "100%", borderRadius: "4px", background: `linear-gradient(90deg, ${color}, ${color}DD)`, width: `${progress(pts, t)}%`, transition: "width 0.8s cubic-bezier(0.4,0,0.2,1)", boxShadow: `0 0 10px ${color}60`, position: "relative" }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)", animation: "shimmer 2s infinite" }} />
+          </div>
         </div>
+      </div>
+      
+      {/* Mock Attributes display */}
+      <div style={{ marginTop: "16px", display: "flex", gap: "8px", position: "relative", zIndex: 1 }}>
+        {t >= 1 && (
+          <div style={{ fontSize: "10px", padding: "4px 8px", background: "rgba(255,255,255,0.1)", borderRadius: "4px", color: "#cbd5e1" }}>
+            🎖 VIP Access
+          </div>
+        )}
+        {pts >= 200 && (
+          <div style={{ fontSize: "10px", padding: "4px 8px", background: "rgba(255,255,255,0.1)", borderRadius: "4px", color: "#cbd5e1" }}>
+            ☕ Free Refills
+          </div>
+        )}
       </div>
     </div>
   );
@@ -88,7 +218,19 @@ function DashboardContent() {
   const [name, setName] = useState("Customer");
   const [cards, setCards] = useState<BrandCard[]>([]);
   const [avatar, setAvatar] = useState<{ level: number; experience: number } | null>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  const [redeemModal, setRedeemModal] = useState<BrandCard | null>(null);
+  const [redeemLoading, setRedeemLoading] = useState(false);
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef(0);
+
+  const showToast = useCallback((message: string, type: "success" | "error" = "success") => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 3500);
+  }, []);
 
   useEffect(() => {
     const paramAddress = params.get("address");
@@ -115,111 +257,563 @@ function DashboardContent() {
     }
   }, [params]);
 
-  useEffect(() => {
-    if (!address) return;
-    fetch(`/api/loyalty-cards/${address}`)
+  const loadData = (addr: string) => {
+    fetch(`/api/loyalty-cards/${addr}`)
       .then(r => r.json())
       .then(data => { setCards(data.cards || []); setLoading(false); })
       .catch(() => setLoading(false));
 
-    fetch(`/api/nft/${address}`)
+    fetch(`/api/nft/${addr}`)
       .then(r => r.json())
       .then(data => { if (data.success && data.avatar) setAvatar(data.avatar); })
       .catch(() => {});
+      
+    fetch(`/api/transactions/${addr}`)
+      .then(r => r.json())
+      .then(data => { if (data.success && data.transactions) setTransactions(data.transactions); })
+      .catch(() => {});
+  };
+
+  useEffect(() => {
+    if (address) loadData(address);
   }, [address]);
 
-  const totalPoints = cards.reduce((sum, c) => sum + c.points_balance, 0);
-  const totalScans = cards.reduce((sum, c) => sum + c.scan_count, 0);
+  const handleRedeem = async (brand: BrandCard, points: number, reward: string) => {
+    setRedeemLoading(true);
+    try {
+      const res = await fetch('/api/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_address: address, brand_id: brand.brand_id, points_to_redeem: points, reward_name: reward })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast(data.message || "Reward redeemed successfully!", "success");
+        loadData(address);
+      } else {
+        showToast(data.error || "Redemption failed.", "error");
+      }
+    } catch (e) {
+      showToast("Something went wrong. Please try again.", "error");
+    } finally {
+      setRedeemLoading(false);
+      setRedeemModal(null);
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("sui_address");
+    localStorage.removeItem("sui_name");
+    localStorage.removeItem("zklogin_ephemeral");
+    window.location.href = "/";
+  };
+
+  const totalPoints = cards.reduce((sum, c) => sum + Number(c.points_balance || 0), 0);
+  const totalScans = cards.reduce((sum, c) => sum + Number(c.scan_count || 0), 0);
 
   return (
     <main style={{ minHeight: "100vh", background: "#0a0e1a", padding: "0" }}>
+      <style>{`
+        .dashboard-container {
+          max-width: 440px;
+          margin: 0 auto;
+          padding: 24px 16px;
+          position: relative;
+        }
+        @media (min-width: 1024px) {
+          .dashboard-container {
+            max-width: 1000px;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 40px;
+            padding: 48px 32px;
+          }
+          .dashboard-left {
+            position: sticky;
+            top: 48px;
+            height: fit-content;
+          }
+        }
+      `}</style>
+
       <div style={{ position: "fixed", top: "10%", left: "15%", width: "300px", height: "300px", borderRadius: "50%", background: "rgba(99,102,241,0.08)", filter: "blur(80px)", pointerEvents: "none" }} />
       <div style={{ position: "fixed", bottom: "20%", right: "10%", width: "250px", height: "250px", borderRadius: "50%", background: "rgba(6,182,212,0.06)", filter: "blur(80px)", pointerEvents: "none" }} />
 
-      <div style={{ maxWidth: "440px", margin: "0 auto", padding: "24px 16px", position: "relative" }}>
+      <div className="dashboard-container">
+        
+        <div className="dashboard-left">
 
         {/* Top nav */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "32px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-            <svg width="28" height="28" viewBox="0 0 56 56">
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "36px" }}>
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            cursor: "pointer",
+            transition: "all 0.3s ease",
+          }}
+          onMouseEnter={(e) => {
+            const svg = e.currentTarget.querySelector('svg');
+            if (svg) (svg as HTMLElement).style.transform = "rotate(10deg) scale(1.1)";
+          }}
+          onMouseLeave={(e) => {
+            const svg = e.currentTarget.querySelector('svg');
+            if (svg) (svg as HTMLElement).style.transform = "rotate(0deg) scale(1)";
+          }}>
+            <svg width="32" height="32" viewBox="0 0 56 56" style={{ transition: "all 0.3s ease", filter: "drop-shadow(0 2px 8px rgba(99,102,241,0.4))" }}>
               <defs>
                 <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
                   <stop offset="0%" stopColor="#6366f1"/>
+                  <stop offset="50%" stopColor="#8b5cf6"/>
                   <stop offset="100%" stopColor="#06b6d4"/>
                 </linearGradient>
               </defs>
-              <polygon points="28,4 52,18 52,38 28,52 4,38 4,18" fill="none" stroke="url(#g1)" strokeWidth="2.5"/>
+              <polygon points="28,4 52,18 52,38 28,52 4,38 4,18" fill="none" stroke="url(#g1)" strokeWidth="3"/>
+              <circle cx="28" cy="28" r="8" fill="url(#g1)" opacity="0.3"/>
             </svg>
-            <span style={{ fontWeight: "700", fontSize: "16px", background: "linear-gradient(135deg, #6366f1, #06b6d4)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>SuiLoyalty</span>
+            <span style={{
+              fontWeight: "800",
+              fontSize: "18px",
+              background: "linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+              letterSpacing: "0.3px",
+            }}>
+              SuiLoyalty
+            </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "20px", padding: "6px 12px" }}>
-            <div style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#22c55e", boxShadow: "0 0 6px #22c55e" }} />
-            <span style={{ fontSize: "12px", color: "#64748b" }}>Devnet</span>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              background: "linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.05))",
+              border: "1px solid rgba(34,197,94,0.3)",
+              borderRadius: "24px",
+              padding: "6px 12px",
+              backdropFilter: "blur(10px)",
+            }}>
+              <div style={{
+                width: "8px",
+                height: "8px",
+                borderRadius: "50%",
+                background: "#22c55e",
+                boxShadow: "0 0 10px #22c55e, 0 0 20px #22c55e80",
+                animation: "pulse 2s infinite",
+              }} />
+              <span style={{ fontSize: "11px", color: "#86efac", fontWeight: "600" }}>Testnet</span>
+            </div>
+            
+            <button 
+              onClick={handleLogout}
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "24px",
+                padding: "6px 12px",
+                color: "#94a3b8",
+                fontSize: "11px",
+                fontWeight: "600",
+                cursor: "pointer",
+                backdropFilter: "blur(10px)",
+                transition: "all 0.2s ease"
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.1)";
+                e.currentTarget.style.color = "#e2e8f0";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.05)";
+                e.currentTarget.style.color = "#94a3b8";
+              }}
+            >
+              Logout
+            </button>
           </div>
         </div>
 
+        <style>{`
+          @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.7; transform: scale(1.2); }
+          }
+        `}</style>
+
         {/* User greeting */}
-        <div style={{ marginBottom: "24px" }}>
-          <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "4px" }}>Welcome back</div>
-          <div style={{ fontSize: "24px", fontWeight: "700", color: "#e2e8f0" }}>{name}</div>
-          <div style={{ fontSize: "11px", color: "#334155", fontFamily: "monospace", marginTop: "4px" }}>
+        <div style={{
+          marginBottom: "28px",
+          background: "linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%)",
+          backdropFilter: "blur(20px)",
+          border: "1px solid rgba(255,255,255,0.1)",
+          borderRadius: "20px",
+          padding: "20px",
+          position: "relative",
+          overflow: "hidden",
+        }}>
+          <div style={{
+            position: "absolute",
+            top: "-20px",
+            right: "-20px",
+            width: "100px",
+            height: "100px",
+            borderRadius: "50%",
+            background: "radial-gradient(circle, rgba(99,102,241,0.2), transparent 70%)",
+            pointerEvents: "none",
+          }} />
+          <div style={{ fontSize: "12px", color: "#94a3b8", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "1px", fontWeight: "600" }}>
+            Welcome back
+          </div>
+          <div style={{
+            fontSize: "28px",
+            fontWeight: "800",
+            background: "linear-gradient(135deg, #e2e8f0, #94a3b8)",
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            marginBottom: "8px",
+            letterSpacing: "0.3px",
+          }}>
+            {name}
+          </div>
+          <div style={{
+            fontSize: "11px",
+            color: "#64748b",
+            fontFamily: "monospace",
+            background: "rgba(0,0,0,0.3)",
+            padding: "6px 10px",
+            borderRadius: "8px",
+            display: "inline-block",
+            border: "1px solid rgba(255,255,255,0.05)",
+          }}>
             {address ? `${address.slice(0, 10)}...${address.slice(-8)}` : ""}
           </div>
         </div>
 
         {/* Summary stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "28px" }}>
           {[
-            { label: "Avatar Level", value: loading ? "—" : (avatar ? `Lvl ${avatar.level}` : "Lvl 1") },
-            { label: "Experience", value: loading ? "—" : (avatar ? `${avatar.experience} XP` : "0 XP") },
-            { label: "Total Points", value: loading ? "—" : totalPoints.toLocaleString() },
-            { label: "Brands Connected", value: loading ? "—" : cards.length },
-          ].map(({ label, value }) => (
-            <div key={label} style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: "12px", padding: "14px 12px", textAlign: "center" }}>
-              <div style={{ fontSize: "18px", fontWeight: "700", color: "#e2e8f0" }}>{value}</div>
-              <div style={{ fontSize: "11px", color: "#64748b", marginTop: "3px" }}>{label}</div>
+            { label: "Avatar Level", value: loading ? "—" : (avatar ? `Lvl ${avatar.level}` : "Lvl 1"), color: "#f59e0b" },
+            { label: "Experience", value: loading ? "—" : (avatar ? `${avatar.experience} XP` : "0 XP"), color: "#8b5cf6" },
+            { label: "Total Points", value: loading ? "—" : totalPoints.toLocaleString(), color: "#06b6d4" },
+            { label: "Brands Connected", value: loading ? "—" : cards.length, color: "#ec4899" },
+          ].map(({ label, value, color }, idx) => (
+            <div
+              key={label}
+              style={{
+                background: "linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.03) 100%)",
+                backdropFilter: "blur(20px)",
+                border: "1px solid rgba(255,255,255,0.1)",
+                borderRadius: "16px",
+                padding: "16px",
+                textAlign: "center",
+                position: "relative",
+                overflow: "hidden",
+                transition: "all 0.3s ease",
+                cursor: "default",
+                animation: `slideInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) ${idx * 0.05}s both`,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = "translateY(-4px) scale(1.02)";
+                e.currentTarget.style.boxShadow = `0 12px 40px -8px ${color}40`;
+                e.currentTarget.style.borderColor = `${color}50`;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = "translateY(0) scale(1)";
+                e.currentTarget.style.boxShadow = "0 4px 20px -4px rgba(0,0,0,0.3)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)";
+              }}
+            >
+              <div style={{
+                position: "absolute",
+                top: "8px",
+                right: "8px",
+                width: "6px",
+                height: "6px",
+                borderRadius: "50%",
+                background: color,
+                boxShadow: `0 0 12px ${color}`,
+              }} />
+              <div style={{
+                fontSize: "24px",
+                fontWeight: "800",
+                background: `linear-gradient(135deg, ${color}, ${color}CC)`,
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                marginBottom: "4px",
+              }}>
+                {value}
+              </div>
+              <div style={{
+                fontSize: "10px",
+                color: "#94a3b8",
+                textTransform: "uppercase",
+                letterSpacing: "0.8px",
+                fontWeight: "600",
+              }}>
+                {label}
+              </div>
             </div>
           ))}
-        </div>
-
-        {/* Brand cards */}
-        <div style={{ marginBottom: "8px" }}>
-          <div style={{ fontSize: "12px", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.6px", marginBottom: "12px" }}>Your Loyalty Cards</div>
-
-          {loading ? (
-            <div style={{ textAlign: "center", padding: "40px 0", color: "#64748b", fontSize: "14px" }}>Loading...</div>
-          ) : cards.length === 0 ? (
-            <div style={{ background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.08)", borderRadius: "16px", padding: "32px", textAlign: "center" }}>
-              <div style={{ fontSize: "13px", color: "#64748b", marginBottom: "4px" }}>No loyalty cards yet</div>
-              <div style={{ fontSize: "11px", color: "#334155" }}>Scan a brand QR code to get started</div>
-            </div>
-          ) : (
-            cards.map(card => <BrandCardUI key={card.brand_id} card={card} />)
-          )}
         </div>
 
         {/* Scan button */}
         <button
           onClick={() => window.location.href = `/scan?address=${address}`}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+            e.currentTarget.style.boxShadow = "0 20px 60px rgba(99,102,241,0.5), 0 0 0 1px rgba(255,255,255,0.1) inset";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = "translateY(0) scale(1)";
+            e.currentTarget.style.boxShadow = "0 8px 32px rgba(99,102,241,0.4)";
+          }}
+          onMouseDown={(e) => {
+            e.currentTarget.style.transform = "translateY(0) scale(0.98)";
+          }}
+          onMouseUp={(e) => {
+            e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
+          }}
           style={{
             width: "100%",
-            padding: "16px",
-            background: "linear-gradient(135deg, #6366f1, #06b6d4)",
+            padding: "18px",
+            background: "linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #06b6d4 100%)",
+            backgroundSize: "200% 100%",
             border: "none",
-            borderRadius: "12px",
+            borderRadius: "16px",
             color: "white",
-            fontSize: "15px",
-            fontWeight: "600",
+            fontSize: "16px",
+            fontWeight: "700",
             cursor: "pointer",
-            letterSpacing: "0.3px",
-            boxShadow: "0 4px 24px rgba(99,102,241,0.3)",
-            marginTop: "16px",
+            letterSpacing: "0.5px",
+            boxShadow: "0 8px 32px rgba(99,102,241,0.4)",
+            marginBottom: "20px",
+            position: "relative",
+            overflow: "hidden",
+            transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
           }}
         >
-          Scan QR Code to Earn Points
+          <span style={{ position: "relative", zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span>Scan QR Code to Earn Points</span>
+          </span>
+          {/* Animated gradient on hover */}
+          <div style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "linear-gradient(135deg, transparent, rgba(255,255,255,0.1), transparent)",
+            animation: "shimmer 3s infinite",
+            pointerEvents: "none",
+          }} />
         </button>
 
-      </div>
+        </div> {/* End dashboard-left */}
+
+        <div className="dashboard-right">
+        {/* Brand cards */}
+        <div style={{ marginBottom: "32px" }}>
+          <div style={{
+            fontSize: "12px",
+            color: "#94a3b8",
+            textTransform: "uppercase",
+            letterSpacing: "1px",
+            marginBottom: "16px",
+            fontWeight: "700",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
+          }}>
+            <span>Your Loyalty Cards</span>
+            {!loading && cards.length > 0 && (
+              <span style={{
+                background: "linear-gradient(135deg, #6366f1, #06b6d4)",
+                color: "white",
+                fontSize: "10px",
+                padding: "2px 8px",
+                borderRadius: "10px",
+                fontWeight: "700",
+              }}>
+                {cards.length}
+              </span>
+            )}
+          </div>
+
+          {loading ? (
+            <div>
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: "linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.06) 50%, rgba(255,255,255,0.03) 100%)",
+                    backgroundSize: "200% 100%",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    borderRadius: "20px",
+                    padding: "24px",
+                    marginBottom: "16px",
+                    height: "180px",
+                    animation: `shimmer 1.5s infinite`,
+                  }}
+                />
+              ))}
+            </div>
+          ) : cards.length === 0 ? (
+            <div style={{
+              background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+              backdropFilter: "blur(20px)",
+              border: "2px dashed rgba(255,255,255,0.15)",
+              borderRadius: "20px",
+              padding: "48px 32px",
+              textAlign: "center",
+              animation: "slideInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) both",
+            }}>
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" style={{ margin: "0 auto 16px" }}>
+                <rect x="3" y="7" width="18" height="13" rx="2" />
+                <path d="M3 11h18" />
+                <circle cx="7" cy="15" r="1" fill="rgba(255,255,255,0.2)" />
+              </svg>
+              <div style={{ fontSize: "15px", color: "#e2e8f0", marginBottom: "8px", fontWeight: "600" }}>No loyalty cards yet</div>
+              <div style={{ fontSize: "12px", color: "#64748b" }}>Scan a brand QR code to start earning rewards</div>
+            </div>
+          ) : (
+            cards.map((card, index) => <BrandCardUI key={card.brand_id} card={card} index={index} onRedeem={setRedeemModal} />)
+          )}
+        </div>
+
+        {/* Transaction History */}
+        {transactions.length > 0 && (
+          <div>
+            <div style={{
+              fontSize: "12px", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px",
+              marginBottom: "16px", fontWeight: "700", marginTop: "16px"
+            }}>
+              Recent Activity
+            </div>
+            <div style={{
+              background: "linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.01) 100%)",
+              backdropFilter: "blur(20px)", border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "20px", overflow: "hidden"
+            }}>
+              {transactions.slice(0, 5).map((tx, idx) => (
+                <div key={tx.id} style={{
+                  padding: "16px 20px", borderBottom: idx < transactions.slice(0,5).length - 1 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                  display: "flex", justifyContent: "space-between", alignItems: "center"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div style={{
+                      width: "32px", height: "32px", borderRadius: "8px",
+                      background: `linear-gradient(135deg, ${tx.brand_color || '#6366f1'}30, ${tx.brand_color || '#6366f1'}15)`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: tx.brand_color || "#6366f1", fontWeight: "bold", fontSize: "14px"
+                    }}>
+                      {tx.brand_name ? tx.brand_name[0] : "?"}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: "14px", color: "#e2e8f0", fontWeight: "600" }}>
+                        {Number(tx.points_added) > 0 ? "Points Earned" : "Reward Redeemed"}
+                      </div>
+                      <div style={{ fontSize: "11px", color: "#64748b" }}>{tx.brand_name} • {new Date(tx.created_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                  <div style={{
+                    fontSize: "15px", fontWeight: "700",
+                    color: Number(tx.points_added) > 0 ? "#10b981" : "#ef4444"
+                  }}>
+                    {Number(tx.points_added) > 0 ? "+" : ""}{tx.points_added} pts
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        </div> {/* End dashboard-right */}
+      </div> {/* End dashboard-container */}
+
+      {/* Redeem Modal */}
+      {redeemModal && (
+        <div style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 100, padding: "20px"
+        }} onClick={() => setRedeemModal(null)}>
+          <div style={{
+            background: "#0f172a", border: `1px solid ${redeemModal.brand_color || '#6366f1'}50`,
+            borderRadius: "24px", padding: "32px", width: "100%", maxWidth: "400px",
+            boxShadow: `0 20px 40px -10px ${redeemModal.brand_color || '#6366f1'}40`,
+            position: "relative"
+          }} onClick={(e) => e.stopPropagation()}>
+            <h2 style={{ fontSize: "20px", color: "white", marginBottom: "8px", fontWeight: "800" }}>Redeem Rewards</h2>
+            <p style={{ fontSize: "14px", color: "#94a3b8", marginBottom: "24px" }}>
+              Spend points from your <strong>{redeemModal.brand_name}</strong> card.
+              You have <strong style={{color: redeemModal.brand_color}}>{Number(redeemModal.points_balance).toLocaleString()}</strong> points available.
+            </p>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px", marginBottom: "24px" }}>
+              {(() => {
+                const cat = (redeemModal.brand_category || "").toLowerCase();
+                let rewards = [
+                  { name: "Mystery Reward", cost: 100 },
+                  { name: `10% off at ${redeemModal.brand_name}`, cost: 500 },
+                  { name: "Premium VIP Status", cost: 1000 }
+                ];
+                if (cat.includes('cafe') || cat.includes('coffee') || cat.includes('food')) {
+                  rewards = [
+                    { name: "Free Pastry", cost: 100 },
+                    { name: "Free Coffee Drink", cost: 300 },
+                    { name: "Skip The Line Pass", cost: 800 }
+                  ];
+                } else if (cat.includes('retail') || cat.includes('clothing') || cat.includes('fashion')) {
+                  rewards = [
+                    { name: "Free Tote Bag", cost: 200 },
+                    { name: "15% Off Any Item", cost: 500 },
+                    { name: "$50 Store Credit", cost: 2000 }
+                  ];
+                }
+
+                return rewards.map(reward => {
+                  const canAfford = Number(redeemModal.points_balance) >= reward.cost;
+                  return (
+                    <button
+                      key={reward.name}
+                      disabled={!canAfford || redeemLoading}
+                      onClick={() => handleRedeem(redeemModal, reward.cost, reward.name)}
+                      style={{
+                        background: canAfford ? `linear-gradient(135deg, ${redeemModal.brand_color}40, ${redeemModal.brand_color}10)` : "rgba(255,255,255,0.05)",
+                        border: `1px solid ${canAfford ? redeemModal.brand_color : 'rgba(255,255,255,0.1)'}`,
+                        padding: "16px", borderRadius: "12px", display: "flex", justifyContent: "space-between",
+                        color: canAfford ? "white" : "#64748b", cursor: canAfford ? "pointer" : "not-allowed",
+                        transition: "all 0.2s"
+                      }}
+                    >
+                      <span style={{ fontWeight: "600" }}>{reward.name}</span>
+                      <span style={{ fontWeight: "800" }}>{reward.cost} pts</span>
+                    </button>
+                  )
+                });
+              })()}
+            </div>
+            <button
+              onClick={() => setRedeemModal(null)}
+              style={{
+                width: "100%", padding: "14px", background: "transparent",
+                border: "1px solid rgba(255,255,255,0.2)", borderRadius: "12px",
+                color: "white", cursor: "pointer", fontWeight: "600"
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <ToastContainer toasts={toasts} onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))} />
     </main>
   );
 }

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuiLoyalty — Sequence Flows</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117; --surface: #1a1d2e; --border: #2a2d3e;
+      --text: #e2e8f0; --muted: #94a3b8;
+      --accent: #6366f1; --accent2: #06b6d4;
+      --green: #10b981; --yellow: #f59e0b; --red: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.7; }
+    .container { display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border);
+      padding: 32px 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+    nav .logo { font-size: 18px; font-weight: 700; margin-bottom: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    nav ul { list-style: none; }
+    nav li { margin-bottom: 4px; }
+    nav a { color: var(--muted); font-size: 14px; display: block; padding: 6px 10px; border-radius: 6px; transition: all 0.15s; }
+    nav a:hover { color: var(--text); background: var(--border); text-decoration: none; }
+    nav .section-label { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin: 20px 0 8px 10px; }
+    main { flex: 1; padding: 48px 64px; }
+    h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: var(--muted); margin-bottom: 48px; font-size: 16px; }
+    h2 { font-size: 22px; font-weight: 600; margin: 56px 0 8px; padding-top: 16px; border-top: 1px solid var(--border); }
+    h2 .tag { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-left: 10px; vertical-align: middle; }
+    h2 .tag.auth { background: rgba(99,102,241,0.2); color: var(--accent); }
+    h2 .tag.scan { background: rgba(6,182,212,0.2); color: var(--accent2); }
+    h2 .tag.merchant { background: rgba(16,185,129,0.2); color: var(--green); }
+    h2 .tag.security { background: rgba(239,68,68,0.2); color: var(--red); }
+    .description { color: var(--muted); margin-bottom: 24px; font-size: 15px; max-width: 720px; }
+    .diagram-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin: 16px 0 40px; overflow-x: auto; }
+    .mermaid { display: flex; justify-content: center; }
+    .step-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    sequence: { actorMargin: 60, messageMargin: 30, mirrorActors: false },
+    themeVariables: {
+      primaryColor: '#6366f1',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#4f46e5',
+      lineColor: '#94a3b8',
+      secondaryColor: '#1a1d2e',
+      background: '#1a1d2e',
+      mainBkg: '#1a1d2e',
+      nodeBorder: '#2a2d3e',
+      titleColor: '#e2e8f0',
+      edgeLabelBackground: '#1a1d2e',
+      signalColor: '#94a3b8',
+      signalTextColor: '#e2e8f0',
+      labelBoxBkgColor: '#1a1d2e',
+      labelBoxBorderColor: '#2a2d3e',
+      labelTextColor: '#e2e8f0',
+      loopTextColor: '#e2e8f0',
+      noteBorderColor: '#4f46e5',
+      noteBkgColor: '#1a1d2e',
+      noteTextColor: '#e2e8f0',
+      activationBorderColor: '#6366f1',
+      activationBkgColor: '#1a1d2e',
+    }
+  });
+</script>
+
+<div class="container">
+  <nav>
+    <div class="logo">SuiLoyalty</div>
+    <div class="section-label">Flows</div>
+    <ul>
+      <li><a href="#zklogin">zkLogin Sign-In</a></li>
+      <li><a href="#qr-new-user">QR Scan — New User</a></li>
+      <li><a href="#qr-returning">QR Scan — Returning User</a></li>
+      <li><a href="#qr-replay">QR Replay Prevention</a></li>
+      <li><a href="#merchant">Merchant QR Generation</a></li>
+      <li><a href="#dashboard">Dashboard Load</a></li>
+    </ul>
+    <div class="section-label">Docs</div>
+    <ul>
+      <li><a href="deployment.html">Deployment Guide</a></li>
+      <li><a href="architecture.html">Architecture</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <h1>Sequence Flows</h1>
+    <p class="subtitle">SuiLoyalty — Blockchain Loyalty Platform on Sui &nbsp;·&nbsp; April 2026</p>
+
+    <!-- ── FLOW 1: zkLogin Sign-In ── -->
+    <h2 id="zklogin">zkLogin Google Sign-In <span class="tag auth">Auth</span></h2>
+    <p class="description">
+      The consumer clicks "Sign in with Google". The backend generates a fresh ephemeral keypair and nonce, redirects to Google OAuth, then exchanges the returned auth code for a JWT. The JWT is used to derive a deterministic Sui wallet address via zkLogin, which is upserted into the database. No private key is ever stored for the user.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User
+    participant PWA as Next.js PWA
+    participant API as Backend API
+    participant ZK  as zklogin.service
+    participant G   as Google OAuth
+    participant DB  as PostgreSQL
+
+    User->>PWA: Click "Sign in with Google"
+    PWA->>API: POST /api/auth/zklogin
+    API->>ZK: generateEphemeralKeypair(currentEpoch)
+    ZK-->>API: { nonce, maxEpoch, randomness, ephemeralPublicKey }
+    API-->>PWA: { authUrl, nonce, maxEpoch, randomness, ephemeralPublicKey }
+    PWA->>PWA: Store ephemeral data in localStorage
+    PWA->>G: Redirect to accounts.google.com?nonce=...
+    User->>G: Enter Google credentials
+    G-->>PWA: Redirect to /api/auth/callback?code=...
+    PWA->>API: POST /api/auth/callback { code }
+    API->>G: POST /token { code, client_id, client_secret, redirect_uri }
+    G-->>API: { id_token (JWT) }
+    API->>API: Decode JWT → extract sub, email, name
+    API->>ZK: deriveSalt(googleSub)
+    ZK-->>API: salt (HMAC-SHA256 of sub)
+    API->>ZK: computeSuiAddress(jwt, salt)
+    ZK-->>API: suiAddress (0x...)
+    API->>DB: UPSERT users (wallet_address, email, display_name)
+    DB-->>API: user row
+    API-->>PWA: { user: { suiAddress, name, email } }
+    PWA->>PWA: Store suiAddress in localStorage
+    PWA->>PWA: Redirect to /dashboard
+      </div>
+    </div>
+
+    <!-- ── FLOW 2: QR Scan New User ── -->
+    <h2 id="qr-new-user">QR Scan — First Time User <span class="tag scan">On-Chain</span></h2>
+    <p class="description">
+      A consumer scans a brand QR code for the first time. Because they have no LoyaltyAvatar yet, the backend mints one on-chain, adds the brand as a BrandNode, then awards points. On-chain state and off-chain DB are updated in sync.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User
+    participant PWA as Next.js PWA
+    participant API as Backend API
+    participant QRS as qr.service
+    participant BC  as blockchain.service
+    participant DB  as PostgreSQL
+    participant SUI as Sui Devnet
+
+    User->>PWA: Scan QR code
+    PWA->>API: POST /api/qr/validate { token_uuid, user_id }
+    API->>API: Validate UUID format (regex guard)
+    API->>QRS: validateQRToken(token_uuid, user_id)
+
+    Note over QRS,DB: Atomic double-spend prevention
+    QRS->>DB: BEGIN
+    QRS->>DB: UPDATE qr_tokens SET used=TRUE WHERE token_uuid=$1 AND used=FALSE
+    DB-->>QRS: token row (1 row = valid, 0 rows = already used)
+    QRS->>DB: COMMIT
+
+    QRS->>DB: SELECT brand name from brands
+    QRS->>DB: SELECT loyalty_avatars WHERE user_id=$1
+    DB-->>QRS: (empty — no avatar)
+
+    Note over QRS,SUI: First-time user — mint avatar on-chain
+    QRS->>BC: mintAvatarOnChain(displayName, walletAddress)
+    BC->>SUI: PTB: loyalty_nft::mint_avatar(name)
+    SUI-->>BC: avatarObjectId
+    BC-->>QRS: avatarObjectId
+
+    QRS->>DB: INSERT loyalty_avatars (on_chain_avatar_id, user_id)
+
+    QRS->>BC: addBrandToAvatarOnChain(avatarObjectId, brandName)
+    BC->>SUI: PTB: loyalty_nft::add_brand(AdminCap, avatar, brandName)
+    SUI-->>BC: tx digest
+
+    QRS->>DB: INSERT loyalty_brand_nodes (user_id, brand_id, brandName, points)
+
+    QRS->>BC: addBrandPointsOnChain(avatarObjectId, brandName, points)
+    BC->>SUI: PTB: loyalty_nft::add_brand_points + gain_experience
+    SUI-->>BC: txDigest
+    BC-->>QRS: txDigest
+
+    QRS-->>API: { token, tx_digest }
+    API-->>PWA: { success: true, token, tx_digest }
+    PWA->>User: Show points awarded + avatar
+      </div>
+    </div>
+
+    <!-- ── FLOW 3: QR Scan Returning User ── -->
+    <h2 id="qr-returning">QR Scan — Returning User <span class="tag scan">On-Chain</span></h2>
+    <p class="description">
+      A returning consumer scans a QR code for a brand they already have a relationship with. The backend skips minting and brand creation — it only awards additional points on-chain and updates the DB.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User
+    participant PWA as Next.js PWA
+    participant API as Backend API
+    participant QRS as qr.service
+    participant BC  as blockchain.service
+    participant DB  as PostgreSQL
+    participant SUI as Sui Devnet
+
+    User->>PWA: Scan QR code
+    PWA->>API: POST /api/qr/validate { token_uuid, user_id }
+    API->>QRS: validateQRToken(token_uuid, user_id)
+
+    QRS->>DB: BEGIN
+    QRS->>DB: UPDATE qr_tokens SET used=TRUE WHERE used=FALSE
+    DB-->>QRS: token row
+    QRS->>DB: COMMIT
+
+    QRS->>DB: SELECT loyalty_avatars WHERE user_id=$1
+    DB-->>QRS: { on_chain_avatar_id }
+
+    QRS->>DB: SELECT loyalty_brand_nodes WHERE user_id=$1 AND brand_id=$2
+    DB-->>QRS: { id } (brand node exists)
+
+    QRS->>DB: UPDATE loyalty_brand_nodes SET points_balance += $1, tier = CASE ...
+    Note over DB: Tier auto-calculated (points / 500)
+
+    QRS->>BC: addBrandPointsOnChain(avatarObjectId, brandName, points)
+    BC->>SUI: PTB: add_brand_points + gain_experience
+    SUI-->>BC: txDigest
+    BC-->>QRS: txDigest
+
+    QRS-->>API: { token, tx_digest }
+    API-->>PWA: { success: true, token, tx_digest }
+    PWA->>User: Show updated points balance
+      </div>
+    </div>
+
+    <!-- ── FLOW 4: QR Replay Prevention ── -->
+    <h2 id="qr-replay">QR Replay Prevention <span class="tag security">Security</span></h2>
+    <p class="description">
+      If a consumer attempts to scan the same QR code twice — or if two requests arrive simultaneously — the atomic <code>UPDATE … WHERE used = FALSE</code> ensures only one succeeds. The second request receives 0 rows and is rejected before any blockchain call is made.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Attacker
+    participant API as Backend API
+    participant QRS as qr.service
+    participant DB  as PostgreSQL
+    participant SUI as Sui Devnet
+
+    Note over Attacker: Attempt 1 (legitimate scan)
+    Attacker->>API: POST /api/qr/validate { token_uuid }
+    API->>QRS: validateQRToken(token_uuid, user_id)
+    QRS->>DB: BEGIN
+    QRS->>DB: UPDATE qr_tokens SET used=TRUE WHERE token_uuid=$1 AND used=FALSE
+    DB-->>QRS: 1 row updated ✓
+    QRS->>DB: COMMIT
+    QRS->>SUI: mint / add_points
+    SUI-->>QRS: txDigest
+    QRS-->>API: success
+
+    Note over Attacker: Attempt 2 (replay attack — same token_uuid)
+    Attacker->>API: POST /api/qr/validate { token_uuid }
+    API->>QRS: validateQRToken(token_uuid, user_id)
+    QRS->>DB: BEGIN
+    QRS->>DB: UPDATE qr_tokens SET used=TRUE WHERE token_uuid=$1 AND used=FALSE
+    DB-->>QRS: 0 rows updated — already used
+    QRS->>DB: ROLLBACK
+    QRS-->>API: throw "Token is invalid, already used, or expired"
+    API-->>Attacker: 400 Bad Request
+    Note over SUI: No blockchain call made
+      </div>
+    </div>
+
+    <!-- ── FLOW 5: Merchant QR Generation ── -->
+    <h2 id="merchant">Merchant QR Generation <span class="tag merchant">Merchant</span></h2>
+    <p class="description">
+      A merchant uses the merchant terminal to generate a batch of QR codes for a brand campaign. Each token is stored in the database with a UUID. The frontend renders them as printable QR codes.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor Merchant
+    participant Terminal as Merchant Terminal
+    participant API as Backend API
+    participant DB  as PostgreSQL
+
+    Merchant->>Terminal: Select brand + points value + quantity
+    loop For each QR code
+        Terminal->>API: POST /api/qr/generate { brand_id, points_value }
+        API->>DB: INSERT qr_tokens (token_uuid=randomUUID(), brand_id, points_value)
+        DB-->>API: { token_uuid, ... }
+        API-->>Terminal: { success: true, token }
+    end
+    Terminal->>Terminal: Render QR codes from token_uuids
+    Terminal->>API: POST /api/qr/mark-printed { token_uuids[] }
+    API->>DB: UPDATE qr_tokens SET printed=TRUE WHERE token_uuid = ANY($1)
+    DB-->>API: OK
+    API-->>Terminal: { success: true }
+    Merchant->>Terminal: Download / print QR sheet
+      </div>
+    </div>
+
+    <!-- ── FLOW 6: Dashboard Load ── -->
+    <h2 id="dashboard">Consumer Dashboard Load <span class="tag auth">Read</span></h2>
+    <p class="description">
+      When the consumer opens their dashboard, the frontend fetches their loyalty data from the backend. The NFT avatar state is read live from the Sui RPC, while brand nodes are served from the PostgreSQL cache.
+    </p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+sequenceDiagram
+    autonumber
+    actor User
+    participant PWA as Next.js Dashboard
+    participant API as Backend API
+    participant DB  as PostgreSQL
+    participant RPC as Sui RPC
+
+    User->>PWA: Open /dashboard
+    PWA->>PWA: Read suiAddress from localStorage
+
+    par Fetch user profile
+        PWA->>API: GET /api/user/:address
+        API->>DB: SELECT users WHERE wallet_address=$1
+        DB-->>API: { display_name, email }
+        API-->>PWA: { user }
+    and Fetch brand loyalty nodes
+        PWA->>API: GET /api/loyalty-cards/:address
+        API->>DB: SELECT loyalty_brand_nodes JOIN brands WHERE wallet_address=$1
+        DB-->>API: [{ brand_name, points_balance, tier, scan_count }]
+        API-->>PWA: { cards[] }
+    and Fetch live NFT state
+        PWA->>API: GET /api/nft/:address
+        API->>DB: SELECT loyalty_avatars WHERE user_id=...
+        DB-->>API: { on_chain_avatar_id }
+        API->>RPC: getObject(on_chain_avatar_id)
+        RPC-->>API: { name, level, experience, locked }
+        API-->>PWA: { avatar }
+    end
+
+    PWA->>User: Render avatar level, XP bar, brand cards
+      </div>
+    </div>
+
+  </main>
+</div>
+</body>
+</html>

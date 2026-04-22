@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuiLoyalty — Architecture</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f1117; --surface: #1a1d2e; --border: #2a2d3e;
+      --text: #e2e8f0; --muted: #94a3b8;
+      --accent: #6366f1; --accent2: #06b6d4;
+      --green: #10b981; --yellow: #f59e0b;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.7; }
+    .container { display: flex; min-height: 100vh; }
+    nav { width: 240px; min-height: 100vh; background: var(--surface); border-right: 1px solid var(--border);
+      padding: 32px 20px; position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0; }
+    nav .logo { font-size: 18px; font-weight: 700; margin-bottom: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    nav ul { list-style: none; }
+    nav li { margin-bottom: 4px; }
+    nav a { color: var(--muted); font-size: 14px; display: block; padding: 6px 10px; border-radius: 6px; transition: all 0.15s; }
+    nav a:hover { color: var(--text); background: var(--border); text-decoration: none; }
+    nav .section-label { color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin: 20px 0 8px 10px; }
+    main { flex: 1; padding: 48px 64px; }
+    h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: var(--muted); margin-bottom: 48px; font-size: 16px; }
+    h2 { font-size: 22px; font-weight: 600; margin: 48px 0 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+    h3 { font-size: 16px; font-weight: 600; margin: 24px 0 12px; color: var(--accent2); }
+    p { margin-bottom: 16px; color: var(--muted); max-width: 720px; }
+    ul { padding-left: 20px; color: var(--muted); margin-bottom: 16px; }
+    li { margin-bottom: 6px; }
+    p code, li code { background: #0d1117; border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 13px; color: var(--accent2); font-family: monospace; }
+
+    /* Diagram containers */
+    .diagram-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin: 24px 0; overflow-x: auto; }
+    .mermaid { display: flex; justify-content: center; }
+
+    /* Layer cards */
+    .layers { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin: 24px 0; }
+    .layer-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .layer-card h4 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+    .layer-card.chain h4 { color: var(--accent); }
+    .layer-card.backend h4 { color: var(--accent2); }
+    .layer-card.frontend h4 { color: var(--green); }
+    .layer-card.db h4 { color: var(--yellow); }
+    .layer-card ul { list-style: none; padding: 0; }
+    .layer-card li { font-size: 13px; color: var(--muted); padding: 3px 0; border-bottom: 1px solid var(--border); }
+    .layer-card li:last-child { border-bottom: none; }
+
+    /* Module table */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    th { background: var(--surface); color: var(--text); font-weight: 600; text-align: left; padding: 10px 14px; border: 1px solid var(--border); }
+    td { padding: 10px 14px; border: 1px solid var(--border); color: var(--muted); vertical-align: top; }
+  </style>
+</head>
+<body>
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'dark',
+    themeVariables: {
+      primaryColor: '#6366f1',
+      primaryTextColor: '#e2e8f0',
+      primaryBorderColor: '#4f46e5',
+      lineColor: '#94a3b8',
+      secondaryColor: '#1a1d2e',
+      tertiaryColor: '#0f1117',
+      background: '#1a1d2e',
+      mainBkg: '#1a1d2e',
+      nodeBorder: '#2a2d3e',
+      clusterBkg: '#1a1d2e',
+      titleColor: '#e2e8f0',
+      edgeLabelBackground: '#1a1d2e',
+    }
+  });
+</script>
+
+<div class="container">
+  <nav>
+    <div class="logo">SuiLoyalty</div>
+    <div class="section-label">Architecture</div>
+    <ul>
+      <li><a href="#overview">System Overview</a></li>
+      <li><a href="#layers">Layer Breakdown</a></li>
+      <li><a href="#contracts">Smart Contracts</a></li>
+      <li><a href="#backend">Backend Services</a></li>
+      <li><a href="#database">Database Schema</a></li>
+      <li><a href="#data-flow">Data Flow</a></li>
+      <li><a href="#security">Security Model</a></li>
+    </ul>
+    <div class="section-label">Docs</div>
+    <ul>
+      <li><a href="deployment.html">Deployment Guide</a></li>
+      <li><a href="sequence-flows.html">Sequence Flows</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <h1>System Architecture</h1>
+    <p class="subtitle">SuiLoyalty — Blockchain Loyalty Platform on Sui &nbsp;·&nbsp; April 2026</p>
+
+    <!-- OVERVIEW -->
+    <h2 id="overview">System Overview</h2>
+    <p>SuiLoyalty is a four-layer system: a Sui Move contract layer managing on-chain NFT state, a Node.js API that bridges Google OAuth / zkLogin with blockchain transactions, a Next.js PWA for consumers, and a PostgreSQL database that mirrors on-chain state for fast queries.</p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+graph TB
+    subgraph Consumer["Consumer Device"]
+        PWA["Next.js PWA\n(port 3001)"]
+        QR["QR Scanner"]
+    end
+
+    subgraph Backend["Backend API (port 3000)"]
+        AUTH["auth routes\n/api/auth/*"]
+        QRAPI["qr routes\n/api/qr/*"]
+        ZKS["zklogin.service"]
+        QRS["qr.service"]
+        BC["blockchain.service"]
+        NFT["nft.service"]
+    end
+
+    subgraph Chain["Sui Devnet"]
+        PKG["loyalty_nft\nPackage"]
+        TPKG["loyalty_token\nPackage"]
+    end
+
+    subgraph DB["PostgreSQL"]
+        USR["users"]
+        AV["loyalty_avatars"]
+        BN["loyalty_brand_nodes"]
+        QRT["qr_tokens"]
+        BR["brands"]
+    end
+
+    Google["Google OAuth"]
+
+    PWA -->|"1 - sign in"| AUTH
+    PWA -->|"2 - scan QR"| QRAPI
+    AUTH -->|"OAuth code exchange"| Google
+    AUTH --> ZKS
+    QRAPI --> QRS
+    QRS --> BC
+    BC -->|"PTB"| PKG
+    BC -->|"PTB"| TPKG
+    NFT -->|"getObject"| PKG
+    QRS --> DB
+    AUTH --> DB
+    PWA -->|"read"| NFT
+      </div>
+    </div>
+
+    <!-- LAYERS -->
+    <h2 id="layers">Layer Breakdown</h2>
+    <div class="layers">
+      <div class="layer-card chain">
+        <h4>On-Chain (Sui Move)</h4>
+        <ul>
+          <li>loyalty_nft module</li>
+          <li>loyalty_token module</li>
+          <li>LoyaltyAvatar NFT</li>
+          <li>BrandNode (Dynamic Object Field)</li>
+          <li>AdminCap / DistributorCap</li>
+        </ul>
+      </div>
+      <div class="layer-card backend">
+        <h4>Backend API (Node.js)</h4>
+        <ul>
+          <li>Express 5 REST API</li>
+          <li>zkLogin JWT verification</li>
+          <li>Ephemeral keypair management</li>
+          <li>QR token generation + validation</li>
+          <li>Sui RPC (PTB execution)</li>
+        </ul>
+      </div>
+      <div class="layer-card frontend">
+        <h4>Frontend (Next.js 15)</h4>
+        <ul>
+          <li>Google Sign-In (zkLogin)</li>
+          <li>QR code scanner</li>
+          <li>NFT avatar dashboard</li>
+          <li>Merchant terminal</li>
+          <li>PWA (installable)</li>
+        </ul>
+      </div>
+      <div class="layer-card db">
+        <h4>Database (PostgreSQL)</h4>
+        <ul>
+          <li>users</li>
+          <li>loyalty_avatars</li>
+          <li>loyalty_brand_nodes</li>
+          <li>qr_tokens</li>
+          <li>brands</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- CONTRACTS -->
+    <h2 id="contracts">Smart Contract Architecture</h2>
+    <p>Two Move modules are deployed as a single package on Sui devnet. The <code>loyalty_nft</code> module manages the avatar NFT lifecycle; <code>loyalty_token</code> manages fungible token distribution.</p>
+
+    <div class="diagram-wrap">
+      <div class="mermaid">
+classDiagram
+    class AdminCap {
+        +id: UID
+    }
+
+    class LoyaltyAvatar {
+        +id: UID
+        +name: String
+        +level: u64
+        +experience: u64
+        +locked: bool
+    }
+
+    class BrandNode {
+        +id: UID
+        +brand_name: String
+        +tier: u64
+        +points: u64
+    }
+
+    class AttributeValue {
+        +value: u64
+        +label: String
+    }
+
+    class BrandTreasury {
+        +id: UID
+        +brand_name: String
+        +balance: Balance~LOYALTY_TOKEN~
+        +total_deposited: u64
+        +total_distributed: u64
+    }
+
+    class DistributorCap {
+        +id: UID
+        +treasury_id: ID
+    }
+
+    LoyaltyAvatar "1" *-- "0..*" BrandNode : dynamic object field
+    BrandNode "1" *-- "0..*" AttributeValue : dynamic field
+    AdminCap ..> LoyaltyAvatar : authorises mutations
+    DistributorCap ..> BrandTreasury : authorises distribution
+      </div>
+    </div>
+
+    <h3>Tier Progression</h3>
+    <table>
+      <thead><tr><th>Tier</th><th>Level</th><th>Points Required</th><th>Formula</th></tr></thead>
+      <tbody>
+        <tr><td>Bronze</td><td>0</td><td>0 – 499</td><td><code>points / 500 = 0</code></td></tr>
+        <tr><td>Silver</td><td>1</td><td>500 – 999</td><td><code>points / 500 = 1</code></td></tr>
+        <tr><td>Gold</td><td>2</td><td>1000+</td><td><code>points / 500 = 2</code></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Avatar Level Progression</h3>
+    <p>Avatar level is computed as <code>1 + (experience / 1000)</code>. Every 1000 XP gained across all brands increases the avatar level by 1.</p>
+
+    <!-- BACKEND -->
+    <h2 id="backend">Backend Service Architecture</h2>
+    <table>
+      <thead><tr><th>Service</th><th>Responsibility</th><th>Dependencies</th></tr></thead>
+      <tbody>
+        <tr><td><code>zklogin.service.ts</code></td><td>Derives user salt, computes Sui address from JWT, generates ephemeral keypairs</td><td><code>@mysten/zklogin</code>, <code>crypto</code></td></tr>
+        <tr><td><code>qr.service.ts</code></td><td>Generates UUID QR tokens, validates them atomically, orchestrates on-chain point award</td><td><code>blockchain.service</code>, <code>pg pool</code></td></tr>
+        <tr><td><code>blockchain.service.ts</code></td><td>Builds and submits PTBs — mint avatar, add brand, add points, gain XP</td><td><code>@mysten/sui</code>, <code>SuiJsonRpcClient</code></td></tr>
+        <tr><td><code>nft.service.ts</code></td><td>Looks up a user's on-chain avatar object ID from DB then fetches live state from RPC</td><td><code>blockchain.service</code>, <code>pg pool</code></td></tr>
+        <tr><td><code>sui.service.ts</code></td><td>Legacy re-export shim for backward compatibility</td><td><code>blockchain.service</code></td></tr>
+      </tbody>
+    </table>
+
+    <!-- DATABASE -->
+    <h2 id="database">Database Schema</h2>
+    <div class="diagram-wrap">
+      <div class="mermaid">
+erDiagram
+    users {
+        UUID id PK
+        VARCHAR wallet_address UK
+        VARCHAR email
+        VARCHAR display_name
+        TIMESTAMPTZ created_at
+    }
+    brands {
+        UUID id PK
+        VARCHAR name
+        VARCHAR category
+        VARCHAR color
+    }
+    qr_tokens {
+        UUID id PK
+        UUID token_uuid UK
+        UUID brand_id FK
+        INT points_value
+        BOOL used
+        UUID used_by FK
+        TIMESTAMPTZ used_at
+        TIMESTAMPTZ expires_at
+    }
+    loyalty_avatars {
+        UUID id PK
+        VARCHAR on_chain_avatar_id UK
+        UUID user_id FK UK
+        TIMESTAMPTZ created_at
+    }
+    loyalty_brand_nodes {
+        UUID id PK
+        UUID user_id FK
+        UUID brand_id FK
+        TEXT brand_name
+        BIGINT points_balance
+        BIGINT scan_count
+        SMALLINT tier
+    }
+    point_transactions {
+        UUID id PK
+        UUID node_id FK
+        BIGINT points_added
+        VARCHAR sui_tx_digest UK
+    }
+
+    users ||--o| loyalty_avatars : "has one"
+    users ||--o{ loyalty_brand_nodes : "has many"
+    users ||--o{ qr_tokens : "used_by"
+    brands ||--o{ qr_tokens : "issued by"
+    brands ||--o{ loyalty_brand_nodes : "tracked by"
+    loyalty_brand_nodes ||--o{ point_transactions : "recorded in"
+      </div>
+    </div>
+
+    <!-- DATA FLOW -->
+    <h2 id="data-flow">QR Scan Data Flow</h2>
+    <p>When a consumer scans a QR code, the following state changes occur in order:</p>
+    <ol style="color:var(--muted); padding-left:20px; margin-bottom:16px;">
+      <li>DB: <code>qr_tokens.used</code> atomically set to TRUE (double-spend prevention)</li>
+      <li>DB: Check <code>loyalty_avatars</code> for existing avatar</li>
+      <li>Chain: <code>loyalty_nft::mint_avatar</code> — if no avatar exists</li>
+      <li>Chain: <code>loyalty_nft::add_brand</code> — if brand relationship is new</li>
+      <li>Chain: <code>loyalty_nft::add_brand_points</code> + <code>gain_experience</code></li>
+      <li>DB: Insert/update <code>loyalty_brand_nodes</code> to mirror on-chain state</li>
+    </ol>
+
+    <!-- SECURITY -->
+    <h2 id="security">Security Model</h2>
+    <table>
+      <thead><tr><th>Threat</th><th>Mitigation</th></tr></thead>
+      <tbody>
+        <tr><td>QR replay attack</td><td>Atomic <code>UPDATE … WHERE used = FALSE</code> — second scan returns 0 rows and is rejected</td></tr>
+        <tr><td>QR forgery / injection</td><td>UUID format validation regex before any DB query</td></tr>
+        <tr><td>OAuth redirect mismatch</td><td><code>REDIRECT_URI</code> hardcoded in env, never built from request headers</td></tr>
+        <tr><td>JWT tampering</td><td>zkLogin address derived deterministically from Google <code>sub</code> + HMAC salt — JWT cannot be forged to claim a different address</td></tr>
+        <tr><td>Unauthorised contract calls</td><td><code>AdminCap</code> and <code>DistributorCap</code> objects required for all mutations — capability pattern enforced by Move type system</td></tr>
+        <tr><td>Wallet address spoofing</td><td><code>jwtToAddress</code> derives the address from the verified JWT; the user cannot choose their Sui address</td></tr>
+      </tbody>
+    </table>
+  </main>
+</div>
+</body>
+</html>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SuiLoyalty — Deployment Guide</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d2e;
+      --border: #2a2d3e;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #6366f1;
+      --accent2: #06b6d4;
+      --green: #10b981;
+      --yellow: #f59e0b;
+      --red: #ef4444;
+      --code-bg: #0d1117;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.7; }
+    a { color: var(--accent2); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Layout */
+    .container { display: flex; min-height: 100vh; }
+    nav {
+      width: 260px; min-height: 100vh; background: var(--surface);
+      border-right: 1px solid var(--border); padding: 32px 20px;
+      position: sticky; top: 0; height: 100vh; overflow-y: auto; flex-shrink: 0;
+    }
+    nav .logo { font-size: 18px; font-weight: 700; margin-bottom: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    nav ul { list-style: none; }
+    nav li { margin-bottom: 4px; }
+    nav a { color: var(--muted); font-size: 14px; display: block; padding: 6px 10px;
+      border-radius: 6px; transition: all 0.15s; }
+    nav a:hover { color: var(--text); background: var(--border); text-decoration: none; }
+    nav .section-label { color: var(--muted); font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; margin: 20px 0 8px 10px; }
+
+    main { flex: 1; padding: 48px 64px; max-width: 860px; }
+    h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .subtitle { color: var(--muted); margin-bottom: 48px; font-size: 16px; }
+    h2 { font-size: 22px; font-weight: 600; margin: 48px 0 16px; padding-top: 16px;
+      border-top: 1px solid var(--border); }
+    h3 { font-size: 16px; font-weight: 600; margin: 28px 0 12px; color: var(--accent2); }
+    p { margin-bottom: 16px; color: var(--muted); }
+    ul, ol { padding-left: 20px; color: var(--muted); margin-bottom: 16px; }
+    li { margin-bottom: 6px; }
+
+    /* Code blocks */
+    pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 20px 24px; overflow-x: auto; margin: 16px 0; font-size: 13px; line-height: 1.6; }
+    code { font-family: 'JetBrains Mono', 'Fira Code', monospace; }
+    p code, li code { background: var(--code-bg); border: 1px solid var(--border);
+      border-radius: 4px; padding: 2px 6px; font-size: 13px; color: var(--accent2); }
+
+    /* Callout boxes */
+    .callout { border-radius: 8px; padding: 16px 20px; margin: 20px 0; border-left: 3px solid; }
+    .callout.info  { background: rgba(99,102,241,0.08); border-color: var(--accent); }
+    .callout.warn  { background: rgba(245,158,11,0.08); border-color: var(--yellow); }
+    .callout.tip   { background: rgba(16,185,129,0.08); border-color: var(--green); }
+    .callout.danger{ background: rgba(239,68,68,0.08);  border-color: var(--red); }
+    .callout strong { display: block; margin-bottom: 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .callout.info   strong { color: var(--accent); }
+    .callout.warn   strong { color: var(--yellow); }
+    .callout.tip    strong { color: var(--green); }
+    .callout.danger strong { color: var(--red); }
+    .callout p { margin: 0; font-size: 14px; }
+
+    /* Steps */
+    .steps { counter-reset: step; }
+    .step { counter-increment: step; display: flex; gap: 16px; margin-bottom: 28px; }
+    .step-number { width: 32px; height: 32px; border-radius: 50%; background: var(--accent);
+      display: flex; align-items: center; justify-content: center; font-weight: 700;
+      font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+    .step-body h3 { margin-top: 0; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+    th { background: var(--surface); color: var(--text); font-weight: 600;
+      text-align: left; padding: 10px 14px; border: 1px solid var(--border); }
+    td { padding: 10px 14px; border: 1px solid var(--border); color: var(--muted); vertical-align: top; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    /* Badge */
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 600; margin-left: 8px; }
+    .badge.required { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge.optional { background: rgba(99,102,241,0.15); color: var(--accent); }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <nav>
+    <div class="logo">SuiLoyalty</div>
+    <div class="section-label">Getting Started</div>
+    <ul>
+      <li><a href="#prerequisites">Prerequisites</a></li>
+      <li><a href="#clone">Clone & Structure</a></li>
+    </ul>
+    <div class="section-label">Services</div>
+    <ul>
+      <li><a href="#database">1. Database</a></li>
+      <li><a href="#contracts">2. Contracts</a></li>
+      <li><a href="#backend">3. Backend API</a></li>
+      <li><a href="#frontend">4. Frontend</a></li>
+    </ul>
+    <div class="section-label">Configuration</div>
+    <ul>
+      <li><a href="#env-backend">Backend .env</a></li>
+      <li><a href="#env-frontend">Frontend .env</a></li>
+      <li><a href="#google-oauth">Google OAuth</a></li>
+    </ul>
+    <div class="section-label">Operations</div>
+    <ul>
+      <li><a href="#running">Running Locally</a></li>
+      <li><a href="#testing">Running Tests</a></li>
+      <li><a href="#cicd">CI/CD</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <h1>Deployment Guide</h1>
+    <p class="subtitle">SuiLoyalty — Blockchain Loyalty Platform on Sui &nbsp;·&nbsp; April 2026</p>
+
+    <!-- PREREQUISITES -->
+    <h2 id="prerequisites">Prerequisites</h2>
+    <table>
+      <thead><tr><th>Tool</th><th>Version</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>Node.js</code></td><td>≥ 20</td><td>Backend API + Next.js frontend</td></tr>
+        <tr><td><code>npm</code></td><td>≥ 10</td><td>Package management</td></tr>
+        <tr><td><code>Sui CLI</code></td><td>≥ 1.44</td><td>Build and deploy Move contracts</td></tr>
+        <tr><td><code>PostgreSQL</code></td><td>≥ 15</td><td>Off-chain loyalty data</td></tr>
+        <tr><td>Google Cloud account</td><td>—</td><td>OAuth 2.0 credentials for zkLogin</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Install Sui CLI</h3>
+    <pre><code># macOS / Linux
+curl -fsSL https://github.com/MystenLabs/sui/releases/download/mainnet-v1.44.0/sui-mainnet-v1.44.0-ubuntu-x86_64.tgz \
+  | tar -xz && sudo mv sui /usr/local/bin/
+
+sui --version  # should print mainnet-v1.44.x</code></pre>
+
+    <!-- CLONE -->
+    <h2 id="clone">Clone &amp; Project Structure</h2>
+    <pre><code>git clone https://github.com/&lt;your-org&gt;/SuiLoyalty.git
+cd SuiLoyalty</code></pre>
+
+    <pre><code>SuiLoyalty/
+├── contracts/          # Move smart contracts (loyalty_nft, loyalty_token)
+├── backend/            # Node.js / Express API
+│   └── src/
+│       ├── services/   # blockchain, qr, zklogin, nft, sui
+│       └── routes/     # auth, qr
+├── frontend/           # Next.js 15 consumer PWA
+├── database/           # SQL schema
+├── docs/               # This documentation
+└── .github/workflows/  # CI/CD pipelines</code></pre>
+
+    <!-- DATABASE -->
+    <h2 id="database">1. Database Setup</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-body">
+          <h3>Create the database</h3>
+          <pre><code>createdb suiloyalty</code></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-body">
+          <h3>Apply the schema</h3>
+          <pre><code>psql suiloyalty &lt; database/schema.sql</code></pre>
+          <p>This creates: <code>users</code>, <code>brands</code>, <code>qr_tokens</code>, <code>loyalty_avatars</code>, <code>loyalty_brand_nodes</code>, <code>point_transactions</code>.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-body">
+          <h3>Apply migration (Sprint 3 schema update)</h3>
+          <pre><code>psql suiloyalty &lt; backend/migrations/002_loyalty_avatar_schema.sql</code></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">4</div>
+        <div class="step-body">
+          <h3>Seed brand data (optional)</h3>
+          <pre><code>psql suiloyalty -c "
+INSERT INTO brands (name, category, color) VALUES
+  ('Nike',    'Sportswear', '#f97316'),
+  ('Adidas',  'Sportswear', '#3b82f6'),
+  ('Puma',    'Sportswear', '#8b5cf6'),
+  ('Reebok',  'Sportswear', '#10b981')
+ON CONFLICT DO NOTHING;"</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTRACTS -->
+    <h2 id="contracts">2. Deploy Smart Contracts</h2>
+    <div class="callout warn">
+      <strong>Network</strong>
+      <p>Contracts are deployed to Sui <strong>devnet</strong>. Devnet resets periodically — redeploy when the RPC returns "Package not found".</p>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-body">
+          <h3>Configure Sui CLI for devnet</h3>
+          <pre><code>sui client switch --env devnet
+sui client active-address   # confirm your deployer address
+sui client faucet           # fund the account</code></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-body">
+          <h3>Build and deploy</h3>
+          <pre><code>cd contracts
+sui move build
+sui client publish --gas-budget 200000000</code></pre>
+          <p>Copy the <strong>PackageID</strong>, <strong>AdminCap ID</strong>, and <strong>TreasuryCap ID</strong> from the output.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-body">
+          <h3>Update backend .env</h3>
+          <pre><code>SUI_PACKAGE_ID=0x&lt;new-package-id&gt;
+ADMIN_CAP_ID=0x&lt;new-admin-cap-id&gt;
+TREASURY_CAP_ID=0x&lt;new-treasury-cap-id&gt;</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- BACKEND -->
+    <h2 id="backend">3. Backend API</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-body">
+          <h3>Install dependencies</h3>
+          <pre><code>cd backend && npm install</code></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-body">
+          <h3>Create <code>backend/.env</code></h3>
+          <p>See the <a href="#env-backend">Environment Variables</a> section below.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-body">
+          <h3>Start the server</h3>
+          <pre><code>npm run dev   # development (tsx watch)
+npm start     # production</code></pre>
+          <p>API is available at <code>http://localhost:3000</code>.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- FRONTEND -->
+    <h2 id="frontend">4. Frontend (Next.js)</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-body">
+          <h3>Install dependencies</h3>
+          <pre><code>cd frontend && npm install</code></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-body">
+          <h3>Create <code>frontend/.env.local</code></h3>
+          <pre><code>NEXT_PUBLIC_API_URL=http://localhost:3000
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=&lt;your-google-client-id&gt;
+NEXT_PUBLIC_SUI_NETWORK=devnet</code></pre>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-body">
+          <h3>Start the dev server</h3>
+          <pre><code>npm run dev   # http://localhost:3001</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- ENV BACKEND -->
+    <h2 id="env-backend">Backend Environment Variables</h2>
+    <table>
+      <thead><tr><th>Variable</th><th>Example / Notes</th><th></th></tr></thead>
+      <tbody>
+        <tr><td><code>PORT</code></td><td><code>3000</code></td><td></td></tr>
+        <tr><td><code>DATABASE_URL</code></td><td><code>postgresql://localhost:5432/suiloyalty</code></td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>SUI_NETWORK</code></td><td><code>devnet</code></td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>SUI_PRIVATE_KEY</code></td><td>Deployer wallet private key (suiprivkey…)</td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>SUI_PACKAGE_ID</code></td><td>Published package object ID</td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>ADMIN_CAP_ID</code></td><td>AdminCap object ID from publish output</td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>TREASURY_CAP_ID</code></td><td>TreasuryCap object ID</td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>GOOGLE_CLIENT_ID</code></td><td>From Google Cloud Console</td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>GOOGLE_CLIENT_SECRET</code></td><td>From Google Cloud Console</td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>REDIRECT_URI</code></td><td><code>http://localhost:3000/api/auth/callback</code></td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>ZKLOGIN_SALT_SECRET</code></td><td>Random 32+ char string — never change after users exist</td><td><span class="badge required">required</span></td></tr>
+        <tr><td><code>SESSION_SECRET</code></td><td>Random 32+ char string</td><td><span class="badge optional">optional</span></td></tr>
+        <tr><td><code>QR_HMAC_SECRET</code></td><td>Random 32+ char string</td><td><span class="badge optional">optional</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="callout danger">
+      <strong>Warning</strong>
+      <p><code>ZKLOGIN_SALT_SECRET</code> derives each user's deterministic Sui address. If you change it after users have been created, all existing wallet addresses will become unreachable and users will lose access to their NFTs.</p>
+    </div>
+
+    <!-- GOOGLE OAUTH -->
+    <h2 id="google-oauth">Google OAuth Setup</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-number">1</div>
+        <div class="step-body">
+          <h3>Create OAuth credentials</h3>
+          <p>Go to <strong>Google Cloud Console → APIs &amp; Services → Credentials → Create Credentials → OAuth 2.0 Client ID</strong>. Application type: <em>Web application</em>.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">2</div>
+        <div class="step-body">
+          <h3>Add authorised redirect URIs</h3>
+          <pre><code>http://localhost:3000/api/auth/callback   # development</code></pre>
+          <div class="callout info">
+            <strong>Critical</strong>
+            <p>The redirect URI must be hardcoded in <code>REDIRECT_URI</code> and match exactly what is registered in Google Cloud. Never build it dynamically from request headers.</p>
+          </div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-number">3</div>
+        <div class="step-body">
+          <h3>Copy credentials to .env</h3>
+          <pre><code>GOOGLE_CLIENT_ID=&lt;your-client-id&gt;.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-&lt;your-secret&gt;</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- RUNNING -->
+    <h2 id="running">Running Locally (All Services)</h2>
+    <p>Open three terminal tabs:</p>
+    <pre><code># Tab 1 — Backend API (port 3000)
+cd backend && npm run dev
+
+# Tab 2 — Frontend (port 3001)
+cd frontend && npm run dev
+
+# Tab 3 — (optional) Watch contract tests
+cd contracts && sui move test</code></pre>
+
+    <div class="callout tip">
+      <strong>Tip</strong>
+      <p>The frontend proxies API calls to <code>localhost:3000</code> via Next.js rewrites. Both services must be running for the zkLogin flow to work end-to-end.</p>
+    </div>
+
+    <!-- TESTING -->
+    <h2 id="testing">Running Tests</h2>
+    <pre><code># Move contract tests (32 tests)
+cd contracts && sui move test
+
+# Backend unit + security tests (31 tests)
+cd backend && npm test
+
+# Backend with coverage report
+cd backend && npm run test:coverage</code></pre>
+
+    <!-- CICD -->
+    <h2 id="cicd">CI/CD Pipelines</h2>
+    <p>Three GitHub Actions workflows trigger on changes to their respective directory:</p>
+    <table>
+      <thead><tr><th>Workflow</th><th>Trigger</th><th>Steps</th></tr></thead>
+      <tbody>
+        <tr><td><code>contracts.yml</code></td><td>Push/PR to <code>contracts/**</code></td><td>Install Sui CLI → <code>sui move build</code> → <code>sui move test</code></td></tr>
+        <tr><td><code>backend.yml</code></td><td>Push/PR to <code>backend/**</code></td><td><code>npm ci</code> → <code>tsc --noEmit</code> → <code>npm run test:coverage</code></td></tr>
+        <tr><td><code>frontend.yml</code></td><td>Push/PR to <code>frontend/**</code></td><td><code>npm ci</code> → <code>tsc --noEmit</code> → <code>npm run build</code></td></tr>
+      </tbody>
+    </table>
+    <p>Secrets required in GitHub repository settings: <code>GOOGLE_CLIENT_ID</code>.</p>
+
+    <!-- TROUBLESHOOTING -->
+    <h2 id="troubleshooting">Troubleshooting</h2>
+
+    <h3>redirect_uri_mismatch</h3>
+    <p>Google OAuth error 400. Ensure <code>REDIRECT_URI</code> in <code>backend/.env</code> exactly matches a URI registered in Google Cloud Console. Do not build the URI dynamically.</p>
+
+    <h3>Package not found on devnet</h3>
+    <p>Devnet resets periodically. Redeploy contracts (<a href="#contracts">Step 2</a>) and update <code>SUI_PACKAGE_ID</code>, <code>ADMIN_CAP_ID</code>, and <code>TREASURY_CAP_ID</code> in <code>backend/.env</code>.</p>
+
+    <h3>Cannot connect to backend</h3>
+    <p>Ensure the backend is running on port 3000 before starting the frontend. Check <code>NEXT_PUBLIC_API_URL</code> matches the backend port.</p>
+
+    <h3>DB connection refused</h3>
+    <p>Ensure PostgreSQL is running: <code>pg_ctl status</code> or <code>brew services list | grep postgresql</code>. Verify <code>DATABASE_URL</code> matches your local setup.</p>
+  </main>
+</div>
+</body>
+</html>

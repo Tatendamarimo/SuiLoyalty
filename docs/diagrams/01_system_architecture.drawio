@@ -1,0 +1,90 @@
+<mxfile host="app.diagrams.net" modified="2026-04-22T00:00:00.000Z" agent="Claude" version="24.0.0">
+  <diagram name="System Architecture" id="sys-arch">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- ROW 1 — Frontend clients -->
+        <mxCell id="consumer" value="&lt;b&gt;Consumer PWA&lt;/b&gt;&lt;br/&gt;&lt;font color=&quot;#555&quot;&gt;Next.js + zkLogin&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1DAF7;strokeColor=#6B4FBB;fontSize=13;verticalAlign=middle;align=center;shadow=0;" vertex="1" parent="1">
+          <mxGeometry x="80" y="60" width="200" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="merchant" value="&lt;b&gt;Merchant Terminal&lt;/b&gt;&lt;br/&gt;&lt;font color=&quot;#555&quot;&gt;QR Batch Generator + Print&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1DAF7;strokeColor=#6B4FBB;fontSize=13;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="320" y="60" width="220" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="google" value="&lt;b&gt;Google OAuth&lt;/b&gt;&lt;br/&gt;&lt;font color=&quot;#555&quot;&gt;accounts.google.com&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5DCC1;strokeColor=#C38C4B;fontSize=13;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="580" y="60" width="200" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ROW 2 — Backend -->
+        <mxCell id="backend" value="&lt;b&gt;Node.js / TypeScript Backend — Express :3000&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CDE8DA;strokeColor=#4C9D7C;fontSize=14;verticalAlign=top;align=center;spacingTop=10;" vertex="1" parent="1">
+          <mxGeometry x="80" y="220" width="920" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-zklogin" value="zkLogin service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5EE;strokeColor=#4C9D7C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="100" y="270" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-qr" value="QR service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5EE;strokeColor=#4C9D7C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="250" y="270" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-brand" value="Brand service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5EE;strokeColor=#4C9D7C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="380" y="270" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-nft" value="NFT / Blockchain service&#xa;(holds AdminCap)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D3E9D3;strokeColor=#4C9D7C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="520" y="260" width="200" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-auth" value="Auth service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5EE;strokeColor=#4C9D7C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="740" y="270" width="130" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="svc-sui" value="Sui RPC client" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5EE;strokeColor=#4C9D7C;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="880" y="270" width="110" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- ROW 3 — Database + Blockchain -->
+        <mxCell id="db" value="&lt;b&gt;PostgreSQL 15 — Speed Layer&lt;/b&gt;&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;brands · users · qr_tokens · loyalty_avatars ·&lt;br/&gt;loyalty_brand_nodes · point_transactions · blockchain_events&lt;/font&gt;" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#F5DCC1;strokeColor=#C38C4B;fontSize=13;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="100" y="470" width="440" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="chain" value="&lt;b&gt;Sui Blockchain (Devnet)&lt;/b&gt;&lt;br/&gt;&lt;font size=&quot;11&quot;&gt;LoyaltyAvatar shared objects&lt;br/&gt;+ BrandNode dynamic object fields&lt;br/&gt;AdminCap-gated mutations&lt;br/&gt;Source of truth&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CDE3F5;strokeColor=#4A7BB5;fontSize=13;verticalAlign=middle;align=center;" vertex="1" parent="1">
+          <mxGeometry x="620" y="470" width="380" height="150" as="geometry" />
+        </mxCell>
+
+        <!-- EDGES -->
+        <mxCell id="e1" value="REST API" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="consumer" target="backend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="REST API" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="merchant" target="backend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="OAuth / JWT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="google" target="backend">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" value="SQL / pg pool" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;startArrow=classic;endFill=1;startFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="backend" target="db">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" value="JSON-RPC&#xa;PTB + AdminCap" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=classic;startArrow=classic;endFill=1;startFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="backend" target="chain">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- LEGEND -->
+        <mxCell id="leg" value="Legend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;fontSize=11;verticalAlign=top;align=left;spacingTop=4;spacingLeft=8;" vertex="1" parent="1">
+          <mxGeometry x="80" y="650" width="920" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-fe" value="Frontend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1DAF7;strokeColor=#6B4FBB;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="150" y="660" width="90" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-be" value="Backend" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CDE8DA;strokeColor=#4C9D7C;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="260" y="660" width="90" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-db" value="Database" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5DCC1;strokeColor=#C38C4B;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="370" y="660" width="90" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-chain" value="Blockchain" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CDE3F5;strokeColor=#4A7BB5;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="480" y="660" width="90" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg-oauth" value="OAuth provider" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5DCC1;strokeColor=#C38C4B;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="590" y="660" width="120" height="22" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

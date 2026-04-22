@@ -1,0 +1,43 @@
+name: Contracts CI
+
+on:
+  push:
+    paths:
+      - 'contracts/**'
+  pull_request:
+    paths:
+      - 'contracts/**'
+
+jobs:
+  build-and-test:
+    name: Build & Test Move Contracts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Sui CLI
+        run: |
+          curl -fsSL \
+            https://github.com/MystenLabs/sui/releases/download/mainnet-v1.44.0/sui-mainnet-v1.44.0-ubuntu-x86_64.tgz \
+            -o sui.tgz
+          tar -xzf sui.tgz
+          sudo mv sui /usr/local/bin/sui
+          sui --version
+
+      - name: Build contracts
+        working-directory: contracts
+        run: sui move build
+
+      - name: Run Move unit tests
+        working-directory: contracts
+        run: sui move test
+
+      - name: Upload build artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: move-build
+          path: contracts/build/
+          retention-days: 7
