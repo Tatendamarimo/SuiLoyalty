@@ -255,17 +255,20 @@ export interface CampaignReportRow {
  * to be CSV-encoded by the route handler. The JOIN to users uses
  * LEFT JOIN so unredeemed tokens still appear.
  */
-export async function getBrandReportData(brandId: string): Promise<CampaignReportRow[]> {
-  const result = await pool.query<CampaignReportRow>(
-    `SELECT q.token_uuid, q.campaign_name, q.points_value, q.created_at, q.printed,
-            q.used, q.used_at, u.wallet_address AS used_by_address,
-            b.name AS brand_name
-       FROM qr_tokens q
-       LEFT JOIN users  u ON u.id = q.used_by
-       LEFT JOIN brands b ON b.id = q.brand_id
-      WHERE q.brand_id = $1
-      ORDER BY q.created_at DESC`,
-    [brandId],
-  );
+export async function getBrandReportData(brandId: string, campaignName?: string): Promise<CampaignReportRow[]> {
+  const query = `
+    SELECT q.token_uuid, q.campaign_name, q.points_value, q.created_at, q.printed,
+           q.used, q.used_at, u.wallet_address AS used_by_address,
+           b.name AS brand_name
+      FROM qr_tokens q
+      LEFT JOIN users  u ON u.id = q.used_by
+      LEFT JOIN brands b ON b.id = q.brand_id
+     WHERE q.brand_id = $1 ${campaignName ? 'AND q.campaign_name = $2' : ''}
+     ORDER BY q.created_at DESC
+  `;
+  const params: any[] = [brandId];
+  if (campaignName) params.push(campaignName);
+  
+  const result = await pool.query<CampaignReportRow>(query, params);
   return result.rows;
 }

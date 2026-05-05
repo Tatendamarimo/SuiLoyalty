@@ -23,7 +23,7 @@ interface BrandReportSummary {
   points_redeemed_30d: number;
 }
 
-async function getBrandReportSummary(brandId: string): Promise<BrandReportSummary> {
+async function getBrandReportSummary(brandId: string, campaignName?: string): Promise<BrandReportSummary> {
   const result = await pool.query<{
     brand_name: string;
     brand_color: string;
@@ -53,10 +53,10 @@ async function getBrandReportSummary(brandId: string): Promise<BrandReportSummar
           WHERE rr.brand_id = b.id AND rr.status = 'fulfilled'
             AND rr.fulfilled_at > NOW() - INTERVAL '30 days')              AS points_redeemed_30d
        FROM brands b
-       LEFT JOIN qr_tokens q ON q.brand_id = b.id
+       LEFT JOIN qr_tokens q ON q.brand_id = b.id ${campaignName ? 'AND q.campaign_name = $2' : ''}
       WHERE b.id = $1
       GROUP BY b.id`,
-    [brandId],
+    campaignName ? [brandId, campaignName] : [brandId],
   );
 
   if (result.rows.length === 0) {
@@ -109,9 +109,9 @@ function truncate(s: string, n: number): string {
  *   - Tabular code list with status, paginated automatically by pdfkit
  *   - Footer with page numbers
  */
-export async function generateCampaignReportPDF(brandId: string, res: Response): Promise<void> {
-  const summary = await getBrandReportSummary(brandId);
-  const rows = await getBrandReportData(brandId);
+export async function generateCampaignReportPDF(brandId: string, res: Response, campaignName?: string): Promise<void> {
+  const summary = await getBrandReportSummary(brandId, campaignName);
+  const rows = await getBrandReportData(brandId, campaignName);
 
   const filename = `SuiLoyalty-${summary.brand_name.replace(/[^a-zA-Z0-9]+/g, '_')}-Campaign-${new Date().toISOString().slice(0, 10)}.pdf`;
   res.setHeader('Content-Type', 'application/pdf');

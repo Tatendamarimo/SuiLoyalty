@@ -578,29 +578,47 @@ function InventoryPanel({ inventory, brand, onRefresh }: { inventory: Inventory 
 
 // ─── Report export card ─────────────────────────────────────────────────────
 
-function ReportExportCard({ brandId }: { brandId: string }) {
+function ReportExportCard({ brandId, refreshTrigger = 0 }: { brandId: string, refreshTrigger?: number }) {
+  const [campaigns, setCampaigns] = useState<string[]>([]);
+  const [selectedCampaign, setSelectedCampaign] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/brand/${brandId}/campaigns`, { credentials: "include", headers: authHeaders() })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.campaigns) {
+          setCampaigns(data.campaigns);
+        }
+      })
+      .catch(err => console.error("Failed to load campaigns", err))
+      .finally(() => setLoading(false));
+  }, [brandId, refreshTrigger]);
+
   const downloadPDF = () => {
-    // Browsers don't send custom headers on a simple <a> click, so we fetch with auth
-    // headers, blob it, and trigger the download from JS.
-    fetch(`/api/brand/${brandId}/report.pdf`, { credentials: "include", headers: authHeaders() })
+    const urlParams = selectedCampaign ? `?campaign=${encodeURIComponent(selectedCampaign)}` : '';
+    fetch(`/api/brand/${brandId}/report.pdf${urlParams}`, { credentials: "include", headers: authHeaders() })
       .then((r) => r.blob())
       .then((blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `SuiLoyalty-Campaign-Report-${new Date().toISOString().slice(0, 10)}.pdf`;
+        a.download = `SuiLoyalty-${selectedCampaign || 'All'}-Campaign-Report-${new Date().toISOString().slice(0, 10)}.pdf`;
         a.click();
         URL.revokeObjectURL(url);
       });
   };
+
   const downloadCSV = () => {
-    fetch(`/api/brand/${brandId}/report.csv`, { credentials: "include", headers: authHeaders() })
+    const urlParams = selectedCampaign ? `?campaign=${encodeURIComponent(selectedCampaign)}` : '';
+    fetch(`/api/brand/${brandId}/report.csv${urlParams}`, { credentials: "include", headers: authHeaders() })
       .then((r) => r.blob())
       .then((blob) => {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `SuiLoyalty-Campaign-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.download = `SuiLoyalty-${selectedCampaign || 'All'}-Campaign-${new Date().toISOString().slice(0, 10)}.csv`;
         a.click();
         URL.revokeObjectURL(url);
       });
@@ -610,6 +628,20 @@ function ReportExportCard({ brandId }: { brandId: string }) {
       <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>Campaign Report</div>
       <div style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
         Printable summary of every QR code issued, scanned, and redeemed.
+      </div>
+      
+      <div style={{ marginBottom: 14 }}>
+        <select
+          value={selectedCampaign}
+          onChange={(e) => setSelectedCampaign(e.target.value)}
+          disabled={loading || campaigns.length === 0}
+          style={{ width: "100%", padding: "8px 12px", background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 6, color: (loading || campaigns.length === 0) ? "#475569" : "#e2e8f0", fontSize: 13, outline: "none", cursor: (loading || campaigns.length === 0) ? "not-allowed" : "pointer" }}
+        >
+          <option value="">{loading ? "Loading Campaigns..." : (campaigns.length === 0 ? "No campaigns yet" : "All Campaigns")}</option>
+          {campaigns.map(c => (
+            <option key={c || 'null'} value={c || ''}>{c || 'Unnamed Campaign'}</option>
+          ))}
+        </select>
       </div>
       <div style={{ display: "flex", gap: 8 }}>
         <button onClick={downloadPDF} style={{
@@ -1082,7 +1114,7 @@ export default function Merchant() {
             <InventoryPanel inventory={inventory} brand={activeBrand} onRefresh={refreshInventory} />
           </div>
 
-          <ReportExportCard brandId={activeBrand.brand_id} />
+          <ReportExportCard brandId={activeBrand.brand_id} refreshTrigger={inventory?.stats?.total_codes || 0} />
         </div>
       </div>
 

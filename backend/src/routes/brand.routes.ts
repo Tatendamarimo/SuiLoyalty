@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Response } from 'express';
 import { requireBrandAuth, listBrandMemberships, type BrandAuthedRequest } from '../middleware/brandAuth.js';
+import pool from '../config/database.js';
 import {
   listPendingForBrand,
   listRecentlyResolvedForBrand,
@@ -132,7 +133,8 @@ router.get(
   requireBrandAuth,
   async (req: BrandAuthedRequest, res: Response) => {
     try {
-      await generateCampaignReportPDF(req.brandId!, res);
+      const campaign = req.query.campaign as string | undefined;
+      await generateCampaignReportPDF(req.brandId!, res, campaign);
     } catch (error: any) {
       // If the PDF stream has already started, we can't reliably send JSON.
       if (!res.headersSent) {
@@ -155,7 +157,8 @@ router.get(
   requireBrandAuth,
   async (req: BrandAuthedRequest, res: Response) => {
     try {
-      const rows = await getBrandReportData(req.brandId!);
+      const campaign = req.query.campaign as string | undefined;
+      const rows = await getBrandReportData(req.brandId!, campaign);
 
       const header = [
         'token_uuid',
@@ -186,9 +189,14 @@ router.get(
         return 'generated';
       };
 
+      const maskUuid = (uuid: string) => {
+        const clean = uuid.replace(/-/g, '');
+        return `${clean.slice(0, 6)}...${clean.slice(-4)}`;
+      };
+
       const lines = rows.map((r) =>
         [
-          r.token_uuid,
+          maskUuid(r.token_uuid),
           r.campaign_name,
           r.brand_name,
           r.points_value,
@@ -210,6 +218,26 @@ router.get(
       res.status(500).json({ success: false, error: error.message });
     }
   },
+);
+
+/**
+ * GET /api/brand/:brand_id/campaigns
+ * Get a list of distinct campaign names for a brand.
+ */
+router.get(
+  '/:brand_id/campaigns',
+  requireBrandAuth,
+  async (req: BrandAuthedRequest, res: Response) => {
+    try {
+      const result = await pool.query(
+        `SELECT DISTINCT campaign_name FROM qr_tokens WHERE brand_id = $1 ORDER BY campaign_name`,
+        [req.brandId!]
+      );
+      res.json({ success: true, campaigns: result.rows.map(r => r.campaign_name) });
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
 );
 
 export default router;
