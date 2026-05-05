@@ -23,6 +23,7 @@ CREATE TABLE qr_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     token_uuid UUID NOT NULL UNIQUE,
     brand_id UUID REFERENCES brands(id),
+    campaign_name VARCHAR(100) DEFAULT 'General Campaign',
     points_value INT NOT NULL DEFAULT 10,
     used BOOLEAN NOT NULL DEFAULT FALSE,
     used_by UUID REFERENCES users(id),

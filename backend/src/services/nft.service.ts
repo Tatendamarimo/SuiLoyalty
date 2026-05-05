@@ -26,8 +26,3 @@ export async function getLoyaltyAvatar(walletAddress: string) {
   return getAvatarByObjectId(result.rows[0].on_chain_avatar_id);
 }
 
-/**
- * @deprecated Use getLoyaltyAvatar instead.
- * Legacy alias kept for backward compatibility.
- */
-export const getLoyaltyCard = getLoyaltyAvatar;

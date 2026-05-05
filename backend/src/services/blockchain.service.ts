@@ -163,6 +163,52 @@ export async function addBrandPointsOnChain(avatarObjectId: string, brandName: s
   return digest;
 }
 
+/**
+ * Records an on-chain redemption against a brand on a user's LoyaltyAvatar.
+ * Increments BrandNode.redeemed without touching BrandNode.points — preserves
+ * the "earned points are immutable" trust property while making redemption
+ * cryptographically auditable. The Move function asserts amount <= available.
+ *
+ * @param avatarObjectId - The Sui object ID of the user's LoyaltyAvatar.
+ * @param brandName - The brand to redeem against (must already exist on the avatar).
+ * @param amount - The number of points to record as redeemed.
+ * @returns The Sui transaction digest.
+ */
+export async function recordRedemptionOnChain(
+  avatarObjectId: string,
+  brandName: string,
+  amount: number,
+): Promise<string> {
+  const keypair = getKeypair();
+  const client = getClient();
+
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${PACKAGE_ID}::loyalty_nft::record_redemption`,
+    arguments: [
+      tx.object(ADMIN_CAP_ID),
+      tx.object(avatarObjectId),
+      tx.pure.string(brandName),
+      tx.pure.u64(amount),
+    ],
+  });
+
+  const result = await client.signAndExecuteTransaction({
+    signer: keypair,
+    transaction: tx,
+    options: { showEffects: true },
+  });
+
+  const status = (result as any).effects?.status?.status;
+  if (status && status !== 'success') {
+    throw new Error(`record_redemption failed: ${(result as any).effects?.status?.error}`);
+  }
+
+  const digest = (result as any).digest as string;
+  console.log(`[blockchain] -${amount} pts redeemed from "${brandName}" on avatar ${avatarObjectId}. Tx: ${digest}`);
+  return digest;
+}
+
 // ─── Read Functions ────────────────────────────────────────────────────────────
 
 /**
@@ -186,7 +232,3 @@ export async function getAvatarByObjectId(objectId: string) {
   };
 }
 
-// ─── Legacy alias ─────────────────────────────────────────────────────────────
-// Kept for backward compatibility with any remaining references to getCardByObjectId.
-/** @deprecated Use getAvatarByObjectId instead. */
-export const getCardByObjectId = getAvatarByObjectId;

@@ -1,6 +1,6 @@
-/// Core module for SuiLoyalty Dynamic NFT lifecycle.
-/// Manages loyalty avatars as owned objects with composable attribute trees
-/// built from hierarchical Dynamic Fields and Dynamic Object Fields.
+// Core module for SuiLoyalty Dynamic NFT lifecycle.
+// Manages loyalty avatars as owned objects with composable attribute trees
+// built from hierarchical Dynamic Fields and Dynamic Object Fields.
 module sui_loyalty::loyalty_nft;
 
 // === Imports ===
@@ -19,6 +19,7 @@ const EBrandNotFound: u64 = 2;
 const EAttributeAlreadyExists: u64 = 3;
 const EAttributeNotFound: u64 = 4;
 const EAvatarLocked: u64 = 5;
+const ERedemptionExceedsBalance: u64 = 6;
 
 // === Structs ===
 
@@ -29,7 +30,7 @@ public struct AdminCap has key, store {
 }
 
 /// A consumer's loyalty avatar — the root of their attribute tree.
-/// Owned by the consumer's address.
+/// This is a shared object, allowing backend mutations via AdminCap.
 public struct LoyaltyAvatar has key, store {
     id: UID,
     /// Display name for the avatar
@@ -44,14 +45,23 @@ public struct LoyaltyAvatar has key, store {
 
 /// A brand node attached as a dynamic object field to a LoyaltyAvatar.
 /// Represents the consumer's relationship with a specific brand.
+///
+/// `points` is the lifetime-earned counter (append-only — preserves the
+/// "brands cannot silently reduce earned points" trust property).
+/// `redeemed` is a separate cumulative counter for points spent.
+/// The available balance is `points - redeemed`, computed off-chain or via
+/// `brand_available()`. Both fields can only increase, so neither can be
+/// silently reduced.
 public struct BrandNode has key, store {
     id: UID,
     /// Brand identifier
     brand_name: String,
     /// Brand-specific loyalty tier (e.g., Bronze, Silver, Gold)
     tier: u64,
-    /// Points accumulated with this brand
+    /// Lifetime points earned with this brand (append-only)
     points: u64,
+    /// Lifetime points redeemed against this brand (append-only)
+    redeemed: u64,
 }
 
 /// Key type for looking up BrandNodes on a LoyaltyAvatar.
@@ -99,6 +109,13 @@ public struct AttributeRemovedEvent has copy, drop {
     avatar_id: ID,
     brand_name: String,
     attribute_name: String,
+}
+
+public struct RedemptionRecordedEvent has copy, drop {
+    avatar_id: ID,
+    brand_name: String,
+    amount: u64,
+    new_redeemed_total: u64,
 }
 
 // === Module Initializer ===
@@ -160,6 +177,7 @@ public fun add_brand(
         brand_name: key.brand_name,
         tier: 0,
         points: 0,
+        redeemed: 0,
     };
 
     event::emit(BrandAddedEvent {
@@ -188,7 +206,7 @@ public fun remove_brand(
         brand_name: key.brand_name,
     });
 
-    let BrandNode { id, brand_name: _, tier: _, points: _ } = brand_node;
+    let BrandNode { id, brand_name: _, tier: _, points: _, redeemed: _ } = brand_node;
     object::delete(id);
 }
 
@@ -299,6 +317,36 @@ public fun add_brand_points(
     brand_node.tier = brand_node.points / 500;
 }
 
+/// Record a redemption against a brand's points.
+/// Increments `redeemed` (append-only) and asserts that total redeemed
+/// never exceeds total earned. The `points` field is left untouched —
+/// "lifetime earned" remains immutable, in keeping with the project's
+/// core trust property that brands cannot silently reduce earned points.
+/// Available balance is `points - redeemed`.
+public fun record_redemption(
+    _: &AdminCap,
+    avatar: &mut LoyaltyAvatar,
+    brand_name: String,
+    amount: u64,
+) {
+    assert!(!avatar.locked, EAvatarLocked);
+    let brand_key = BrandKey { brand_name };
+    assert!(dof::exists_(&avatar.id, brand_key), EBrandNotFound);
+
+    let brand_node: &mut BrandNode = dof::borrow_mut(&mut avatar.id, brand_key);
+    let available = brand_node.points - brand_node.redeemed;
+    assert!(amount <= available, ERedemptionExceedsBalance);
+
+    brand_node.redeemed = brand_node.redeemed + amount;
+
+    event::emit(RedemptionRecordedEvent {
+        avatar_id: object::id(avatar),
+        brand_name: brand_key.brand_name,
+        amount,
+        new_redeemed_total: brand_node.redeemed,
+    });
+}
+
 // === Admin Functions ===
 
 /// Lock an avatar (e.g., during a sponsored mutation).
@@ -347,6 +395,20 @@ public fun brand_tier(avatar: &LoyaltyAvatar, brand_name: String): u64 {
 }
 
 /// Get a brand node's points.
+public fun brand_redeemed(avatar: &LoyaltyAvatar, brand_name: String): u64 {
+    let key = BrandKey { brand_name };
+    if (!dof::exists_(&avatar.id, key)) return 0;
+    let node: &BrandNode = dof::borrow(&avatar.id, key);
+    node.redeemed
+}
+
+public fun brand_available(avatar: &LoyaltyAvatar, brand_name: String): u64 {
+    let key = BrandKey { brand_name };
+    if (!dof::exists_(&avatar.id, key)) return 0;
+    let node: &BrandNode = dof::borrow(&avatar.id, key);
+    node.points - node.redeemed
+}
+
 public fun brand_points(avatar: &LoyaltyAvatar, brand_name: String): u64 {
     let brand_key = BrandKey { brand_name };
     assert!(dof::exists_(&avatar.id, brand_key), EBrandNotFound);

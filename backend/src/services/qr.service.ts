@@ -10,14 +10,20 @@ import { mintAvatarOnChain, addBrandToAvatarOnChain, addBrandPointsOnChain } fro
  * @param points_value - (Optional) The number of points this scan will award (defaults to 10).
  * @returns The newly created QR token record.
  */
-export async function generateQRToken(brand_id?: string, points_value?: number) {
+export async function generateQRToken(brand_id?: string, points_value?: number, campaign_name?: string, expires_in_days?: number) {
   const token_uuid = randomUUID();
+  
+  let expiresAt: Date | null = null;
+  if (expires_in_days && expires_in_days > 0) {
+    expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + expires_in_days);
+  }
 
   const result = await pool.query(
-    `INSERT INTO qr_tokens (token_uuid, expires_at, brand_id, points_value)
-     VALUES ($1, NULL, $2, $3)
+    `INSERT INTO qr_tokens (token_uuid, expires_at, brand_id, points_value, campaign_name)
+     VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
-    [token_uuid, brand_id || null, points_value ?? 10]
+    [token_uuid, expiresAt, brand_id || null, points_value ?? 10, campaign_name || 'General Campaign']
   );
 
   return result.rows[0];
@@ -73,6 +79,11 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
       );
       const brandName: string = brandResult.rows[0]?.name || 'Unknown Brand';
 
+      // Track the brand node id so we can record the earn event in point_transactions
+      // after the on-chain call succeeds. Without this, the dashboard's transaction
+      // history and points-over-time chart will read from an empty table.
+      let nodeId: string | null = null;
+
       // 3. Check if user has a LoyaltyAvatar
       const existingAvatar = await pool.query(
         `SELECT on_chain_avatar_id FROM loyalty_avatars WHERE user_id = $1`,
@@ -106,12 +117,14 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
         // Add the brand node to the new avatar
         await addBrandToAvatarOnChain(avatarObjectId, brandName);
 
-        // Record the brand relationship
-        await pool.query(
+        // Record the brand relationship — capture id for the audit-log INSERT below.
+        const newNode = await pool.query(
           `INSERT INTO loyalty_brand_nodes (user_id, brand_id, brand_name, points_balance, scan_count, tier)
-           VALUES ($1, $2, $3, $4, 1, 0)`,
+           VALUES ($1, $2, $3, $4, 1, 0)
+           RETURNING id`,
           [user_id, token.brand_id, brandName, pointsToAdd]
         );
+        nodeId = newNode.rows[0].id;
 
         // Award initial points to the brand node
         txDigest = await addBrandPointsOnChain(avatarObjectId, brandName, pointsToAdd);
@@ -129,20 +142,23 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
           // Brand node doesn't exist yet — add it on-chain first
           await addBrandToAvatarOnChain(avatarObjectId, brandName);
 
-          await pool.query(
+          const newNode = await pool.query(
             `INSERT INTO loyalty_brand_nodes (user_id, brand_id, brand_name, points_balance, scan_count, tier)
-             VALUES ($1, $2, $3, $4, 1, 0)`,
+             VALUES ($1, $2, $3, $4, 1, 0)
+             RETURNING id`,
             [user_id, token.brand_id, brandName, pointsToAdd]
           );
+          nodeId = newNode.rows[0].id;
         } else {
+          nodeId = existingBrandNode.rows[0].id;
           // Brand node exists — just update points
           await pool.query(
             `UPDATE loyalty_brand_nodes
              SET points_balance = points_balance + $1,
                  scan_count     = scan_count + 1,
                  tier = CASE
-                   WHEN points_balance + $1 >= 500 THEN 2
-                   WHEN points_balance + $1 >= 100 THEN 1
+                   WHEN points_balance + $1 >= 1000 THEN 2
+                   WHEN points_balance + $1 >= 500 THEN 1
                    ELSE 0
                  END
              WHERE user_id = $2 AND brand_id = $3`,
@@ -152,6 +168,17 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
 
         // Award points on-chain for the brand
         txDigest = await addBrandPointsOnChain(avatarObjectId, brandName, pointsToAdd);
+      }
+
+      // Record this earn event in the off-chain audit log. The dashboard transaction
+      // history, points-over-time chart, and Recent Activity feed all read from
+      // point_transactions — without this row they appear empty even after a successful scan.
+      if (nodeId && txDigest) {
+        await pool.query(
+          `INSERT INTO point_transactions (node_id, points_added, sui_tx_digest)
+           VALUES ($1, $2, $3)`,
+          [nodeId, pointsToAdd, txDigest]
+        );
       }
     }
 

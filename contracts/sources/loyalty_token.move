@@ -5,7 +5,7 @@
 #[allow(deprecated_usage)]
 module sui_loyalty::loyalty_token;
 
-// === Imports ===
+// Imports 
 
 use std::string::String;
 use sui::{
@@ -14,18 +14,18 @@ use sui::{
     event,
 };
 
-// === Errors ===
+// Errors 
 
 const EInsufficientTreasuryBalance: u64 = 100;
 const EDistributorMismatch: u64 = 101;
 const EZeroAmount: u64 = 102;
 
-// === OTW ===
+// OTW
 
 /// One-Time Witness for creating the LOYALTY_TOKEN coin type.
 public struct LOYALTY_TOKEN has drop {}
 
-// === Structs ===
+// Structs 
 
 /// Platform-level admin capability. Created once in init.
 /// The platform operator holds this to create treasuries and manage minting.
@@ -57,7 +57,7 @@ public struct DistributorCap has key, store {
     treasury_id: ID,
 }
 
-// === Events ===
+// Events 
 
 public struct TreasuryCreatedEvent has copy, drop {
     treasury_id: ID,
@@ -78,7 +78,7 @@ public struct TokensDistributedEvent has copy, drop {
     remaining_balance: u64,
 }
 
-// === Module Initializer ===
+// Module Initializer
 
 fun init(witness: LOYALTY_TOKEN, ctx: &mut TxContext) {
     // Create the LOYALTY_TOKEN currency (0 decimals — 1 token = 1 loyalty point)
@@ -104,7 +104,7 @@ fun init(witness: LOYALTY_TOKEN, ctx: &mut TxContext) {
     }, ctx.sender());
 }
 
-// === Treasury Management ===
+// Treasury Management 
 
 /// Create a new brand treasury. Only the platform admin can do this.
 /// The treasury is created as a shared object so the backend sponsor can access it.
@@ -170,7 +170,7 @@ public fun mint_to_treasury(
     });
 }
 
-// === Token Distribution ===
+// Token Distribution
 
 /// Distribute tokens from a brand treasury to a consumer.
 /// Called by the backend sponsor using its DistributorCap.
@@ -219,7 +219,7 @@ public fun withdraw_from_treasury(
     transfer::public_transfer(coin, recipient);
 }
 
-// === View Functions ===
+// View Functions 
 
 /// Get the brand name of a treasury.
 public fun treasury_brand_name(treasury: &BrandTreasury): String {
@@ -251,7 +251,7 @@ public fun distributor_treasury_id(cap: &DistributorCap): ID {
     cap.treasury_id
 }
 
-// === Test-Only Functions ===
+// Test-Only Functions 
 
 #[test_only]
 public fun init_for_testing(ctx: &mut TxContext) {

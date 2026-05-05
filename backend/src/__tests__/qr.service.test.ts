@@ -30,9 +30,9 @@ jest.unstable_mockModule('../config/database.js', () => ({
 
 // ── Mock blockchain service ───────────────────────────────────────────────────
 
-const mockMintAvatar = jest.fn<() => Promise<string>>();
-const mockAddBrand   = jest.fn<() => Promise<string>>();
-const mockAddPoints  = jest.fn<() => Promise<string>>();
+const mockMintAvatar = jest.fn<(displayName: string, recipientAddress: string) => Promise<string>>();
+const mockAddBrand   = jest.fn<(avatarObjectId: string, brandName: string) => Promise<string>>();
+const mockAddPoints  = jest.fn<(avatarObjectId: string, brandName: string, points: number) => Promise<string>>();
 
 jest.unstable_mockModule('../services/blockchain.service.js', () => ({
   mintAvatarOnChain:       mockMintAvatar,
@@ -151,11 +151,12 @@ describe('validateQRToken — new user with brand', () => {
       .mockResolvedValueOnce({ rows: [] });             // COMMIT
 
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [{ name: 'Nike' }] })                                   // brand lookup
-      .mockResolvedValueOnce({ rows: [] })                                                    // no avatar yet
-      .mockResolvedValueOnce({ rows: [{ display_name: 'Alice', wallet_address: '0xabc' }] }) // user info
-      .mockResolvedValueOnce({ rows: [] })                                                    // INSERT avatars
-      .mockResolvedValueOnce({ rows: [] })                                                    // INSERT brand_nodes
+      .mockResolvedValueOnce({ rows: [{ name: 'Nike' }] })                                     // brand lookup
+      .mockResolvedValueOnce({ rows: [] })                                                      // no avatar yet
+      .mockResolvedValueOnce({ rows: [{ display_name: 'Alice', wallet_address: '0xabc' }] })   // user info
+      .mockResolvedValueOnce({ rows: [] })                                                      // INSERT avatars
+      .mockResolvedValueOnce({ rows: [{ id: 'node-1' }] })                                      // INSERT brand_nodes RETURNING id
+      .mockResolvedValueOnce({ rows: [] })                                                      // INSERT point_transactions
       .mockResolvedValueOnce({ rows: [{ ...fakeToken, brand_name: 'Nike', tx_digest: 'tx-add-points' }] }); // final SELECT
 
     const result = await validateQRToken(VALID_UUID, USER_ID);
@@ -181,11 +182,12 @@ describe('validateQRToken — returning user', () => {
       .mockResolvedValueOnce({ rows: [] });
 
     mockPoolQuery
-      .mockResolvedValueOnce({ rows: [{ name: 'Adidas' }] })
-      .mockResolvedValueOnce({ rows: [{ on_chain_avatar_id: AVATAR_OBJ_ID }] })
-      .mockResolvedValueOnce({ rows: [{ id: 'node-1' }] })
-      .mockResolvedValueOnce({ rows: [] })  // UPDATE brand node
-      .mockResolvedValueOnce({ rows: [{ ...fakeToken, brand_name: 'Adidas', tx_digest: 'tx-points-only' }] });
+      .mockResolvedValueOnce({ rows: [{ name: 'Adidas' }] })                                       // brand lookup
+      .mockResolvedValueOnce({ rows: [{ on_chain_avatar_id: AVATAR_OBJ_ID }] })                   // existing avatar
+      .mockResolvedValueOnce({ rows: [{ id: 'node-1' }] })                                         // existing brand_node lookup
+      .mockResolvedValueOnce({ rows: [] })                                                         // UPDATE brand_node
+      .mockResolvedValueOnce({ rows: [] })                                                         // INSERT point_transactions
+      .mockResolvedValueOnce({ rows: [{ ...fakeToken, brand_name: 'Adidas', tx_digest: 'tx-points-only' }] }); // final SELECT
 
     const result = await validateQRToken(VALID_UUID, USER_ID);
 

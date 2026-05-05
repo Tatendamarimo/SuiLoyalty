@@ -212,6 +212,7 @@ function BrandCardUI({ card, index, onRedeem }: { card: BrandCard; index: number
   );
 }
 
+
 function DashboardContent() {
   const params = useSearchParams();
   const [address, setAddress] = useState("");
@@ -223,6 +224,8 @@ function DashboardContent() {
   
   const [redeemModal, setRedeemModal] = useState<BrandCard | null>(null);
   const [redeemLoading, setRedeemLoading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [toasts, setToasts] = useState<Toast[]>([]);
   const toastIdRef = useRef(0);
 
@@ -302,10 +305,29 @@ function DashboardContent() {
   };
 
   const handleLogout = () => {
+    fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
     localStorage.removeItem("sui_address");
     localStorage.removeItem("sui_name");
     localStorage.removeItem("zklogin_ephemeral");
     window.location.href = "/";
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!window.confirm("Are you sure you want to permanently delete your account and all data? Your on-chain Loyalty Avatar will be anonymised but your personal data will be erased. This cannot be undone.")) return;
+    setIsDeleting(true);
+    try {
+      const res = await fetch("/api/users/me", { method: "DELETE", credentials: "include" });
+      const data = await res.json();
+      if (data.success) {
+        handleLogout();
+      } else {
+        showToast(data.error || "Failed to delete account.", "error");
+      }
+    } catch (e) {
+      showToast("Error deleting account.", "error");
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const totalPoints = cards.reduce((sum, c) => sum + Number(c.points_balance || 0), 0);
@@ -354,11 +376,11 @@ function DashboardContent() {
           }}
           onMouseEnter={(e) => {
             const svg = e.currentTarget.querySelector('svg');
-            if (svg) (svg as HTMLElement).style.transform = "rotate(10deg) scale(1.1)";
+            if (svg) svg.style.transform = "rotate(10deg) scale(1.1)";
           }}
           onMouseLeave={(e) => {
             const svg = e.currentTarget.querySelector('svg');
-            if (svg) (svg as HTMLElement).style.transform = "rotate(0deg) scale(1)";
+            if (svg) svg.style.transform = "rotate(0deg) scale(1)";
           }}>
             <svg width="32" height="32" viewBox="0 0 56 56" style={{ transition: "all 0.3s ease", filter: "drop-shadow(0 2px 8px rgba(99,102,241,0.4))" }}>
               <defs>
@@ -386,36 +408,33 @@ function DashboardContent() {
             <div style={{
               display: "flex",
               alignItems: "center",
-              gap: "8px",
-              background: "linear-gradient(135deg, rgba(34,197,94,0.1), rgba(34,197,94,0.05))",
-              border: "1px solid rgba(34,197,94,0.3)",
-              borderRadius: "24px",
-              padding: "6px 12px",
-              backdropFilter: "blur(10px)",
+              gap: "6px",
+              background: "#1e293b",
+              border: "1px solid #334155",
+              borderRadius: "16px",
+              padding: "4px 10px",
             }}>
               <div style={{
-                width: "8px",
-                height: "8px",
+                width: "6px",
+                height: "6px",
                 borderRadius: "50%",
                 background: "#22c55e",
-                boxShadow: "0 0 10px #22c55e, 0 0 20px #22c55e80",
-                animation: "pulse 2s infinite",
               }} />
-              <span style={{ fontSize: "11px", color: "#86efac", fontWeight: "600" }}>Testnet</span>
+              <span style={{ fontSize: "11px", color: "#cbd5e1", fontWeight: "500", letterSpacing: "0.5px" }}>Sui Testnet</span>
             </div>
-            
             <button 
-              onClick={handleLogout}
+              onClick={() => setSettingsOpen(true)}
               style={{
                 background: "rgba(255,255,255,0.05)",
                 border: "1px solid rgba(255,255,255,0.1)",
-                borderRadius: "24px",
-                padding: "6px 12px",
+                borderRadius: "50%",
+                width: "32px",
+                height: "32px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 color: "#94a3b8",
-                fontSize: "11px",
-                fontWeight: "600",
                 cursor: "pointer",
-                backdropFilter: "blur(10px)",
                 transition: "all 0.2s ease"
               }}
               onMouseEnter={(e) => {
@@ -426,8 +445,12 @@ function DashboardContent() {
                 e.currentTarget.style.background = "rgba(255,255,255,0.05)";
                 e.currentTarget.style.color = "#94a3b8";
               }}
+              title="Settings"
             >
-              Logout
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
             </button>
           </div>
         </div>
@@ -474,22 +497,41 @@ function DashboardContent() {
           }}>
             {name}
           </div>
-          <div style={{
-            fontSize: "11px",
-            color: "#64748b",
-            fontFamily: "monospace",
-            background: "rgba(0,0,0,0.3)",
-            padding: "6px 10px",
-            borderRadius: "8px",
-            display: "inline-block",
-            border: "1px solid rgba(255,255,255,0.05)",
-          }}>
+          <div 
+            onClick={() => {
+              if (address) {
+                navigator.clipboard.writeText(address);
+                alert("Sui Address copied to clipboard!");
+              }
+            }}
+            style={{
+              fontSize: "11px",
+              color: "#64748b",
+              fontFamily: "monospace",
+              background: "rgba(0,0,0,0.3)",
+              padding: "6px 10px",
+              borderRadius: "8px",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              border: "1px solid rgba(255,255,255,0.05)",
+              cursor: "pointer",
+              transition: "color 0.2s"
+            }}
+            title="Click to copy"
+            onMouseEnter={(e) => e.currentTarget.style.color = "#e2e8f0"}
+            onMouseLeave={(e) => e.currentTarget.style.color = "#64748b"}
+          >
             {address ? `${address.slice(0, 10)}...${address.slice(-8)}` : ""}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
           </div>
         </div>
 
         {/* Summary stats */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "28px" }}>
+        <div className="merchant-split-grid" style={{ marginBottom: "28px", gap: "12px" }}>
           {[
             { label: "Avatar Level", value: loading ? "—" : (avatar ? `Lvl ${avatar.level}` : "Lvl 1"), color: "#f59e0b" },
             { label: "Experience", value: loading ? "—" : (avatar ? `${avatar.experience} XP` : "0 XP"), color: "#8b5cf6" },
@@ -685,6 +727,7 @@ function DashboardContent() {
           )}
         </div>
 
+
         {/* Transaction History */}
         {transactions.length > 0 && (
           <div>
@@ -799,15 +842,58 @@ function DashboardContent() {
                 });
               })()}
             </div>
-            <button
-              onClick={() => setRedeemModal(null)}
-              style={{
-                width: "100%", padding: "14px", background: "transparent",
-                border: "1px solid rgba(255,255,255,0.2)", borderRadius: "12px",
-                color: "white", cursor: "pointer", fontWeight: "600"
-              }}
-            >
-              Cancel
+              <button 
+                onClick={() => setRedeemModal(null)}
+                style={{
+                  width: "100%", padding: "14px", background: "transparent",
+                  border: "none", color: "#64748b", fontWeight: "600", cursor: "pointer"
+                }}
+              >
+                Cancel
+              </button>
+          </div>
+        </div>
+      )}
+
+      {/* Settings Modal */}
+      {settingsOpen && (
+        <div onClick={() => setSettingsOpen(false)} style={{
+          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+          background: "rgba(0,0,0,0.8)", backdropFilter: "blur(10px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 100, padding: "20px"
+        }}>
+          <div onClick={(e) => e.stopPropagation()} style={{
+            background: "#0f172a", border: "1px solid #334155",
+            borderRadius: "24px", padding: "32px", width: "100%", maxWidth: "340px",
+            boxShadow: "0 20px 40px -10px rgba(0,0,0,0.5)"
+          }}>
+            <h2 style={{ fontSize: "20px", color: "white", marginBottom: "8px", fontWeight: "800" }}>Settings</h2>
+            <p style={{ fontSize: "13px", color: "#94a3b8", marginBottom: "24px" }}>
+              Manage your SuiLoyalty account.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button onClick={handleLogout} style={{
+                width: "100%", padding: "14px", background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.1)", borderRadius: "12px",
+                color: "#e2e8f0", fontWeight: "600", cursor: "pointer", transition: "all 0.2s"
+              }}>
+                Log out
+              </button>
+              <button onClick={handleDeleteAccount} disabled={isDeleting} style={{
+                width: "100%", padding: "14px", background: "rgba(239,68,68,0.1)",
+                border: "1px solid rgba(239,68,68,0.3)", borderRadius: "12px",
+                color: "#fca5a5", fontWeight: "600", cursor: isDeleting ? "not-allowed" : "pointer",
+                transition: "all 0.2s"
+              }}>
+                {isDeleting ? "Deleting..." : "Permanently Delete Account"}
+              </button>
+            </div>
+            <button onClick={() => setSettingsOpen(false)} style={{
+              width: "100%", padding: "14px", marginTop: "12px", background: "transparent",
+              border: "none", color: "#64748b", fontWeight: "600", cursor: "pointer"
+            }}>
+              Close
             </button>
           </div>
         </div>

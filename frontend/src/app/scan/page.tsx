@@ -14,6 +14,11 @@ function ScanContent() {
   const scanningRef = useRef(false);
 
   async function startCamera() {
+    if (!address) {
+      setStatus("error");
+      setMessage("You need to be signed in to earn points. Please sign in first.");
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } } });
       if (videoRef.current) {
@@ -87,7 +92,15 @@ function ScanContent() {
         setMessage("Points earned! Your NFT is updating on-chain.");
       } else {
         setStatus("error");
-        setMessage(data.error || "Invalid or already used QR code.");
+        // Map raw backend errors to friendly messages
+        const raw = data.error || "";
+        let friendly = "Invalid or already used QR code.";
+        if (raw.includes("already used") || raw.includes("used")) friendly = "This QR code has already been redeemed.";
+        else if (raw.includes("expired")) friendly = "This QR code has expired.";
+        else if (raw.includes("not found") || raw.includes("Invalid QR")) friendly = "QR code not recognised. Please scan a SuiLoyalty code.";
+        else if (raw.includes("User not found")) friendly = "Your account wasn't found. Try signing in again.";
+        else if (raw) friendly = raw; // use backend message only if it's meaningful
+        setMessage(friendly);
       }
     } catch {
       setStatus("error");

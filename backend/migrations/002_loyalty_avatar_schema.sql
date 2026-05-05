@@ -1,6 +1,5 @@
 -- Migration: Replace loyalty_cards with loyalty_avatars + loyalty_brand_nodes
--- Run this script against your PostgreSQL database to update the schema
--- for the new loyalty_nft contract structure.
+
 
 -- ─── Drop old tables (safe — loyalty_cards already dropped in first run) ──────
 DROP TABLE IF EXISTS point_transactions CASCADE;

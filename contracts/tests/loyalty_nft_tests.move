@@ -221,6 +221,108 @@ module sui_loyalty::loyalty_nft_tests {
         s.end();
     }
 
+    // ── Redemption (record_redemption) ─────────────────────────────────────────
+
+    #[test]
+    fun test_record_redemption_decrements_available_balance() {
+        let mut s = setup();
+        s.next_tx(USER);
+        {
+            let avatar = loyalty_nft::create_avatar(string::utf8(b"Liam"), s.ctx());
+            transfer::public_transfer(avatar, USER);
+        };
+        s.next_tx(ADMIN);
+        {
+            let cap        = s.take_from_sender<AdminCap>();
+            let mut avatar = s.take_from_address<LoyaltyAvatar>(USER);
+            loyalty_nft::add_brand(&cap, &mut avatar, string::utf8(b"Nike"), s.ctx());
+            loyalty_nft::add_brand_points(&cap, &mut avatar, string::utf8(b"Nike"), 500);
+
+            // Earned 500, redeem 200 — points field stays at 500, redeemed becomes 200, available = 300
+            loyalty_nft::record_redemption(&cap, &mut avatar, string::utf8(b"Nike"), 200);
+
+            assert!(loyalty_nft::brand_points(&avatar,    string::utf8(b"Nike")) == 500, 0); // earned unchanged
+            assert!(loyalty_nft::brand_redeemed(&avatar,  string::utf8(b"Nike")) == 200, 1);
+            assert!(loyalty_nft::brand_available(&avatar, string::utf8(b"Nike")) == 300, 2);
+
+            s.return_to_sender(cap);
+            transfer::public_transfer(avatar, USER);
+        };
+        s.end();
+    }
+
+    #[test]
+    fun test_record_redemption_accumulates_across_calls() {
+        let mut s = setup();
+        s.next_tx(USER);
+        {
+            let avatar = loyalty_nft::create_avatar(string::utf8(b"Maya"), s.ctx());
+            transfer::public_transfer(avatar, USER);
+        };
+        s.next_tx(ADMIN);
+        {
+            let cap        = s.take_from_sender<AdminCap>();
+            let mut avatar = s.take_from_address<LoyaltyAvatar>(USER);
+            loyalty_nft::add_brand(&cap, &mut avatar, string::utf8(b"Amazon"), s.ctx());
+            loyalty_nft::add_brand_points(&cap, &mut avatar, string::utf8(b"Amazon"), 1000);
+
+            loyalty_nft::record_redemption(&cap, &mut avatar, string::utf8(b"Amazon"), 100);
+            loyalty_nft::record_redemption(&cap, &mut avatar, string::utf8(b"Amazon"), 250);
+            loyalty_nft::record_redemption(&cap, &mut avatar, string::utf8(b"Amazon"), 50);
+
+            assert!(loyalty_nft::brand_redeemed(&avatar,  string::utf8(b"Amazon")) == 400, 0); // 100+250+50
+            assert!(loyalty_nft::brand_available(&avatar, string::utf8(b"Amazon")) == 600, 1); // 1000-400
+
+            s.return_to_sender(cap);
+            transfer::public_transfer(avatar, USER);
+        };
+        s.end();
+    }
+
+    #[test, expected_failure(abort_code = sui_loyalty::loyalty_nft::ERedemptionExceedsBalance)]
+    fun test_record_redemption_exceeds_available_fails() {
+        let mut s = setup();
+        s.next_tx(USER);
+        {
+            let avatar = loyalty_nft::create_avatar(string::utf8(b"Noah"), s.ctx());
+            transfer::public_transfer(avatar, USER);
+        };
+        s.next_tx(ADMIN);
+        {
+            let cap        = s.take_from_sender<AdminCap>();
+            let mut avatar = s.take_from_address<LoyaltyAvatar>(USER);
+            loyalty_nft::add_brand(&cap, &mut avatar, string::utf8(b"Starbucks"), s.ctx());
+            loyalty_nft::add_brand_points(&cap, &mut avatar, string::utf8(b"Starbucks"), 100);
+
+            // Try to redeem 200 when only 100 available — must abort
+            loyalty_nft::record_redemption(&cap, &mut avatar, string::utf8(b"Starbucks"), 200);
+
+            s.return_to_sender(cap);
+            transfer::public_transfer(avatar, USER);
+        };
+        s.end();
+    }
+
+    #[test, expected_failure(abort_code = sui_loyalty::loyalty_nft::EBrandNotFound)]
+    fun test_record_redemption_missing_brand_fails() {
+        let mut s = setup();
+        s.next_tx(USER);
+        {
+            let avatar = loyalty_nft::create_avatar(string::utf8(b"Olivia"), s.ctx());
+            transfer::public_transfer(avatar, USER);
+        };
+        s.next_tx(ADMIN);
+        {
+            let cap        = s.take_from_sender<AdminCap>();
+            let mut avatar = s.take_from_address<LoyaltyAvatar>(USER);
+            // No brand added — redemption against missing brand must abort
+            loyalty_nft::record_redemption(&cap, &mut avatar, string::utf8(b"Ghost"), 50);
+            s.return_to_sender(cap);
+            transfer::public_transfer(avatar, USER);
+        };
+        s.end();
+    }
+
     // ── Experience & level ─────────────────────────────────────────────────────
 
     #[test]
