@@ -250,7 +250,7 @@ export default function Picker() {
             title="I'm a brand operator"
             tagline="Generate single-use QR codes for your products, track campaigns, fulfil customer redemptions, and export per-campaign reports — all from a single brand portal."
             bullets={[
-              "Multi-brand portal with role-based access",
+              "Multi-brand portal with owner / admin / operator roles",
               "Batch QR generation, mark-printed workflow",
               "Real-time pending-redemption queue",
             ]}
