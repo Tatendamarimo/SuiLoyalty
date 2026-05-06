@@ -122,6 +122,7 @@
       <li><a href="#running">Running Locally</a></li>
       <li><a href="#testing">Running Tests</a></li>
       <li><a href="#cicd">CI/CD</a></li>
+      <li><a href="#secrets">Secrets Policy</a></li>
       <li><a href="#troubleshooting">Troubleshooting</a></li>
     </ul>
   </nav>
@@ -397,6 +398,47 @@ cd backend && npm run test:coverage</code></pre>
       </tbody>
     </table>
     <p>Secrets required in GitHub repository settings: <code>GOOGLE_CLIENT_ID</code>.</p>
+
+    <!-- SECRETS POLICY -->
+    <h2 id="secrets">Secrets Policy</h2>
+    <p>SuiLoyalty handles three classes of value that must never end up in version control: Sui private keys (deployer / sponsor wallets), Google OAuth client secrets, and the HMAC secrets used for zkLogin salt derivation, QR signing, and session signing. The repository is structured so a single rule covers all of them.</p>
+
+    <div class="callout danger">
+      <strong>Hard rule</strong>
+      <p>No real secret is ever committed to this repository. <code>backend/.env</code> and <code>frontend/.env.local</code> are local-only and gitignored at three levels (root <code>.gitignore</code>, package <code>.gitignore</code>, and a final defence-in-depth check before each push).</p>
+    </div>
+
+    <h3>Where each value lives</h3>
+    <table>
+      <thead><tr><th>Value</th><th>Lives in</th><th>Visible in committed files?</th></tr></thead>
+      <tbody>
+        <tr><td><code>SUI_PRIVATE_KEY</code></td><td><code>backend/.env</code> (local) · GitHub Secret in CI</td><td>Never. CI uses a dummy placeholder because <code>blockchain.service</code> is mocked in every test.</td></tr>
+        <tr><td><code>GOOGLE_CLIENT_SECRET</code></td><td><code>backend/.env</code> only</td><td>Never. Frontend bundles must never see this value — only <code>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> belongs in <code>frontend/.env.local</code>.</td></tr>
+        <tr><td><code>ZKLOGIN_SALT_SECRET</code>, <code>QR_HMAC_SECRET</code>, <code>SESSION_SECRET</code></td><td><code>backend/.env</code> (local) · GitHub Secret in CI</td><td>Never in production form. CI uses clearly-labelled <code>ci-test-*</code> placeholders.</td></tr>
+        <tr><td>Google client ID, package ID, network name</td><td><code>.env</code> + CI inline</td><td>Yes — these are public identifiers, safe to commit.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Onboarding a new contributor</h3>
+    <ol>
+      <li>Clone the repo.</li>
+      <li><code>cp backend/.env.example backend/.env</code> and fill in real values from a secure channel (1Password, signal, in-person).</li>
+      <li><code>cp frontend/.env.local.example frontend/.env.local</code> and fill in <code>NEXT_PUBLIC_*</code> values only.</li>
+      <li>Verify nothing sensitive will be staged: <code>git status</code> should never show <code>.env</code>.</li>
+    </ol>
+
+    <h3>If a secret is leaked</h3>
+    <ol>
+      <li><strong>Rotate first, audit second.</strong> Generate a new Sui keypair (<code>sui client new-address ed25519</code>), transfer <code>AdminCap</code> / <code>TreasuryCap</code> / <code>TokenAdminCap</code> to the new address, then update <code>backend/.env</code> and the GitHub Secret.</li>
+      <li>For Google credentials: revoke and reissue in the Google Cloud Console; update the GitHub Secret.</li>
+      <li>For HMAC secrets: regenerate as long random strings; rotating <code>ZKLOGIN_SALT_SECRET</code> changes every customer's derived Sui address, so this rotation is reserved for genuine compromise.</li>
+      <li>Scrub the leaked value from git history with <code>git filter-repo</code> if it ever made it into a commit, then force-push and notify any forks.</li>
+    </ol>
+
+    <div class="callout info">
+      <strong>CI hardening</strong>
+      <p>Anything sensitive in <code>.github/workflows/*.yml</code> must come from <code>${{ secrets.* }}</code>, not a hardcoded value. The workflows currently require only <code>GOOGLE_CLIENT_ID</code>; add others as production deployment is wired up.</p>
+    </div>
 
     <!-- TROUBLESHOOTING -->
     <h2 id="troubleshooting">Troubleshooting</h2>

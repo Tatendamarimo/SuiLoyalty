@@ -1,0 +1,35 @@
+# SuiLoyalty — repo-wide gitignore (defence-in-depth on top of per-package ones).
+# Per-package .gitignore files in backend/, frontend/, contracts/ remain the
+# primary source of truth. The rules here exist so a new folder added at the
+# repo root cannot silently commit secrets.
+
+# ─── Secrets — must never be committed ───────────────────────────────────────
+.env
+.env.*
+!.env.example
+!.env.local.example
+*.pem
+*.key
+secrets/
+
+# ─── OS / editor cruft ───────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# ─── Node / TS build artefacts ───────────────────────────────────────────────
+node_modules/
+dist/
+build/
+.next/
+*.tsbuildinfo
+coverage/
+
+# ─── Move build artefacts ────────────────────────────────────────────────────
+contracts/build/
+
+# ─── Office temp/lock files ──────────────────────────────────────────────────
+~$*

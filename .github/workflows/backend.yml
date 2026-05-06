@@ -35,17 +35,25 @@ jobs:
       - name: Run tests with coverage
         working-directory: backend
         run: npm run test:coverage
+        # All env values below are CI-only placeholders. The Jest suite mocks
+        # blockchain.service and pg pool entirely, so no real network or
+        # credentials are exercised. NEVER paste a real Sui private key,
+        # Google client secret, or production database URL into this file —
+        # CI is a public artefact. Anything sensitive must come from
+        # ${{ secrets.* }} (configured in GitHub repo Settings → Secrets).
         env:
           NODE_ENV: test
           ZKLOGIN_SALT_SECRET: ci-test-salt-secret-do-not-use-in-prod
-          GOOGLE_CLIENT_ID: test-client-id
-          GOOGLE_CLIENT_SECRET: test-client-secret
+          GOOGLE_CLIENT_ID: ci-test-client-id
+          GOOGLE_CLIENT_SECRET: ci-test-client-secret
           REDIRECT_URI: http://localhost:3000/api/auth/callback
           DATABASE_URL: postgresql://localhost:5432/suiloyalty_test
-          SUI_NETWORK: devnet
+          SUI_NETWORK: testnet
           SUI_PACKAGE_ID: 0x0000000000000000000000000000000000000000000000000000000000000000
           ADMIN_CAP_ID: 0x0000000000000000000000000000000000000000000000000000000000000000
-          SUI_PRIVATE_KEY: suiprivkey1qzwzxlmme477yehw3l9gc7zq6gr82jslvvrecn5wsypnxttjq334gucrwsh
+          # CI-only placeholder. Real Sui keys never live in this file —
+          # blockchain.service is mocked in every test that imports it.
+          SUI_PRIVATE_KEY: ci-test-sui-key-placeholder-not-a-real-key
 
       - name: Upload coverage report
         if: success()

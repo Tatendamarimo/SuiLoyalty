@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SuiLoyalty Frontend
 
-## Getting Started
+Next.js 16 / React 19 / Tailwind 4 progressive web app. Hosts both the consumer sign-in flow and the brand-operator merchant terminal under a single audience picker at `/`.
 
-First, run the development server:
+## Routes
+
+| Route | Audience | Purpose |
+| --- | --- | --- |
+| `/` | Anyone | Audience picker — Customer · Brand operator |
+| `/customer` | Customer | Google Sign-In via zkLogin |
+| `/dashboard` | Customer | Per-brand loyalty cards, NFT avatar stats, reward redemption |
+| `/scan` | Customer | Camera QR scanner (jsQR) |
+| `/merchant` | Brand operator | Brand portal — picker, QR generator, redemption queue, PDF / CSV reports |
+
+## Local development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev          # http://localhost:3001
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+The frontend proxies `/api/*` to `http://127.0.0.1:3000` (see `next.config.ts`); the backend must be running for any flow to work end-to-end.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Environment template: [`.env.local.example`](.env.local.example). Copy to `.env.local` and fill in real values. Only `NEXT_PUBLIC_*` variables are safe in the frontend bundle — server-side secrets (Google client secret, Sui keys, DB URL) live exclusively in `backend/.env`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Production build
 
-## Learn More
+```bash
+npm run build
+npm start
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Documentation
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+For architecture, deployment, and full project context, see the [root README](../README.md) and `docs/` directory.
