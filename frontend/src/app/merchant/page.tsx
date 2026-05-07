@@ -684,14 +684,14 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
     setProgress(0);
 
     await fetch(`/api/qr/clear-unprinted`, {
-      method: "POST", headers: authHeaders(brand.brand_id),
+      method: "POST", headers: authHeaders(),
       body: JSON.stringify({ brand_id: brand.brand_id }),
     });
 
     const results: QRToken[] = [];
     for (let i = 0; i < quantity; i++) {
       const res = await fetch(`/api/qr/generate`, {
-        method: "POST", headers: authHeaders(brand.brand_id),
+        method: "POST", headers: authHeaders(),
         body: JSON.stringify({ 
           brand_id: brand.brand_id, 
           points_value: pointsPerScan, 
@@ -749,7 +749,7 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
     a.click();
     URL.revokeObjectURL(url);
     await fetch(`/api/qr/mark-printed`, {
-      method: "POST", headers: authHeaders(brand.brand_id),
+      method: "POST", headers: authHeaders(),
       body: JSON.stringify({ token_uuids: tokens.map((t) => t.token_uuid) }),
     });
     setTokens([]);
@@ -764,7 +764,7 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
     a.download = `${brand.brand_name}_qr_${index + 1}.png`;
     a.click();
     await fetch(`/api/qr/mark-printed`, {
-      method: "POST", headers: authHeaders(brand.brand_id),
+      method: "POST", headers: authHeaders(),
       body: JSON.stringify({ token_uuids: [token.token_uuid] }),
     });
     onGenerated();
