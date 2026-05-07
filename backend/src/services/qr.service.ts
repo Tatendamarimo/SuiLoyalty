@@ -2,14 +2,7 @@ import { randomUUID } from 'crypto';
 import pool from '../config/database.js';
 import { mintAvatarOnChain, addBrandToAvatarOnChain, addBrandPointsOnChain } from './blockchain.service.js';
 
-/**
- * Generates a new unique QR token to be scanned by a user.
- * Tokens are stored in the database and can optionally be tied to a specific brand or points value.
- *
- * @param brand_id - (Optional) The UUID of the brand issuing the QR code.
- * @param points_value - (Optional) The number of points this scan will award (defaults to 10).
- * @returns The newly created QR token record.
- */
+// Generates a cryptographically secure token (UUID v4) to prevent enumeration attacks.
 export async function generateQRToken(brand_id?: string, points_value?: number, campaign_name?: string, expires_in_days?: number) {
   const token_uuid = randomUUID();
   
@@ -29,27 +22,14 @@ export async function generateQRToken(brand_id?: string, points_value?: number, 
   return result.rows[0];
 }
 
-/**
- * Validates a scanned QR token. If valid, marks it as used and awards loyalty points to the user.
- *
- * Flow:
- * 1. Atomically marks the QR token as used (prevents double-spend).
- * 2. Checks if the user has a LoyaltyAvatar — mints one on-chain if not.
- * 3. Checks if the user's avatar has a BrandNode for this brand — creates one if not.
- * 4. Calls add_brand_points on-chain to award points to that brand node.
- * 5. Updates the database to mirror the on-chain state.
- *
- * @param token_uuid - The unique UUID of the scanned QR token.
- * @param user_id - The internal DB user ID of the person scanning the code.
- * @returns An object containing the token details, enriched brand info, and the blockchain tx digest.
- * @throws Error if the token is invalid, already used, or expired.
- */
+// Validates token scanned by user. Uses atomic transactions to prevent double-spend attacks.
 export async function validateQRToken(token_uuid: string, user_id: string) {
   const client = await pool.connect();
   try {
+    // Begin transaction block to ensure atomic operations and data integrity
     await client.query('BEGIN');
 
-    // 1. Atomically mark QR as used to prevent double-spend
+    // Claim the token atomically using an UPDATE lock to prevent race conditions (double-scan)
     const tokenResult = await client.query(
       `UPDATE qr_tokens
        SET used = TRUE, used_by = $2, used_at = NOW()
@@ -66,25 +46,21 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
     }
 
     const token = tokenResult.rows[0];
-    await client.query('COMMIT');
+    await client.query('COMMIT'); // Commit early to minimize transaction lock duration
 
     const pointsToAdd = token.points_value ?? 10;
     let txDigest: string | null = null;
 
     if (token.brand_id) {
-      // 2. Look up brand name for the brand ID
       const brandResult = await pool.query(
         `SELECT name FROM brands WHERE id = $1`,
         [token.brand_id]
       );
       const brandName: string = brandResult.rows[0]?.name || 'Unknown Brand';
 
-      // Track the brand node id so we can record the earn event in point_transactions
-      // after the on-chain call succeeds. Without this, the dashboard's transaction
-      // history and points-over-time chart will read from an empty table.
       let nodeId: string | null = null;
 
-      // 3. Check if user has a LoyaltyAvatar
+      // Check if user already has an on-chain avatar to maintain referential integrity off-chain
       const existingAvatar = await pool.query(
         `SELECT on_chain_avatar_id FROM loyalty_avatars WHERE user_id = $1`,
         [user_id]
@@ -93,7 +69,6 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
       let avatarObjectId: string;
 
       if (existingAvatar.rows.length === 0) {
-        // No avatar yet — mint one on-chain
         const userResult = await pool.query(
           `SELECT display_name, wallet_address FROM users WHERE id = $1`,
           [user_id]
@@ -105,19 +80,17 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
           throw new Error('Unable to mint avatar: User has no wallet address');
         }
 
+        // Lazy-mint the avatar on-chain on first scan to optimize gas costs
         avatarObjectId = await mintAvatarOnChain(displayName, walletAddress);
 
-        // Record the avatar in the database
         await pool.query(
           `INSERT INTO loyalty_avatars (on_chain_avatar_id, user_id)
            VALUES ($1, $2)`,
           [avatarObjectId, user_id]
         );
 
-        // Add the brand node to the new avatar
         await addBrandToAvatarOnChain(avatarObjectId, brandName);
 
-        // Record the brand relationship — capture id for the audit-log INSERT below.
         const newNode = await pool.query(
           `INSERT INTO loyalty_brand_nodes (user_id, brand_id, brand_name, points_balance, scan_count, tier)
            VALUES ($1, $2, $3, $4, 1, 0)
@@ -126,11 +99,9 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
         );
         nodeId = newNode.rows[0].id;
 
-        // Award initial points to the brand node
         txDigest = await addBrandPointsOnChain(avatarObjectId, brandName, pointsToAdd);
 
       } else {
-        // Avatar exists — check if brand node exists
         avatarObjectId = existingAvatar.rows[0].on_chain_avatar_id;
 
         const existingBrandNode = await pool.query(
@@ -139,7 +110,6 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
         );
 
         if (existingBrandNode.rows.length === 0) {
-          // Brand node doesn't exist yet — add it on-chain first
           await addBrandToAvatarOnChain(avatarObjectId, brandName);
 
           const newNode = await pool.query(
@@ -151,7 +121,6 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
           nodeId = newNode.rows[0].id;
         } else {
           nodeId = existingBrandNode.rows[0].id;
-          // Brand node exists — just update points
           await pool.query(
             `UPDATE loyalty_brand_nodes
              SET points_balance = points_balance + $1,
@@ -166,13 +135,10 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
           );
         }
 
-        // Award points on-chain for the brand
         txDigest = await addBrandPointsOnChain(avatarObjectId, brandName, pointsToAdd);
       }
 
-      // Record this earn event in the off-chain audit log. The dashboard transaction
-      // history, points-over-time chart, and Recent Activity feed all read from
-      // point_transactions — without this row they appear empty even after a successful scan.
+      // Log the transaction in the off-chain audit table for reporting and dashboard synchronization
       if (nodeId && txDigest) {
         await pool.query(
           `INSERT INTO point_transactions (node_id, points_added, sui_tx_digest)
@@ -182,7 +148,6 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
       }
     }
 
-    // Return token enriched with brand info
     const fullResult = await pool.query(
       `SELECT qt.*, b.name as brand_name, b.color as brand_color, b.category as brand_category
        FROM qr_tokens qt

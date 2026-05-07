@@ -1,6 +1,6 @@
 // Core module for SuiLoyalty Dynamic NFT lifecycle.
-// Manages loyalty avatars as owned objects with composable attribute trees
-// built from hierarchical Dynamic Fields and Dynamic Object Fields.
+// Implements a composable on-chain attribute tree using Dynamic Fields (DF)
+// and Dynamic Object Fields (DOF) for constant-time O(1) attribute lookups.
 module sui_loyalty::loyalty_nft;
 
 // === Imports ===
@@ -23,58 +23,38 @@ const ERedemptionExceedsBalance: u64 = 6;
 
 // === Structs ===
 
-/// Admin capability for managing the loyalty platform.
-/// Granted to the package publisher on module init.
 public struct AdminCap has key, store {
     id: UID,
 }
 
-/// A consumer's loyalty avatar — the root of their attribute tree.
-/// This is a shared object, allowing backend mutations via AdminCap.
+// Main root object representing the consumer's on-chain identity
 public struct LoyaltyAvatar has key, store {
     id: UID,
-    /// Display name for the avatar
     name: String,
-    /// Overall loyalty level across all brands
     level: u64,
-    /// Total experience points accumulated
     experience: u64,
-    /// Whether the avatar is locked (e.g., during a mutation)
     locked: bool,
 }
 
-/// A brand node attached as a dynamic object field to a LoyaltyAvatar.
-/// Represents the consumer's relationship with a specific brand.
-///
-/// `points` is the lifetime-earned counter (append-only — preserves the
-/// "brands cannot silently reduce earned points" trust property).
-/// `redeemed` is a separate cumulative counter for points spent.
-/// The available balance is `points - redeemed`, computed off-chain or via
-/// `brand_available()`. Both fields can only increase, so neither can be
-/// silently reduced.
+// Brand nodes attached to the avatar via Dynamic Object Fields (DOF).
+// Uses separate append-only counters for 'points' and 'redeemed' to preserve historical state auditability,
+// ensuring that points can never be silently decremented on-chain (immutable ledger design).
 public struct BrandNode has key, store {
     id: UID,
-    /// Brand identifier
     brand_name: String,
-    /// Brand-specific loyalty tier (e.g., Bronze, Silver, Gold)
     tier: u64,
-    /// Lifetime points earned with this brand (append-only)
     points: u64,
-    /// Lifetime points redeemed against this brand (append-only)
     redeemed: u64,
 }
 
-/// Key type for looking up BrandNodes on a LoyaltyAvatar.
 public struct BrandKey has copy, drop, store {
     brand_name: String,
 }
 
-/// Key type for looking up attributes on a BrandNode.
 public struct AttributeKey has copy, drop, store {
     attribute_name: String,
 }
 
-/// Stores a single attribute value on a BrandNode via dynamic field.
 public struct AttributeValue has copy, drop, store {
     value: u64,
     label: String,
@@ -128,8 +108,6 @@ fun init(ctx: &mut TxContext) {
 
 // === Public Functions ===
 
-/// Create a new loyalty avatar for the caller.
-/// Returns the avatar so it can be used in PTBs before transfer.
 public fun create_avatar(
     name: String,
     ctx: &mut TxContext,
@@ -151,7 +129,6 @@ public fun create_avatar(
     avatar
 }
 
-/// Create a new avatar and share it.
 entry fun mint_avatar(
     name: String,
     ctx: &mut TxContext,
@@ -160,8 +137,7 @@ entry fun mint_avatar(
     transfer::share_object(avatar);
 }
 
-/// Add a brand relationship to the avatar's attribute tree.
-/// Creates a BrandNode as a dynamic object field on the avatar.
+// Attaches a BrandNode dynamically to avoid O(N) array search overhead
 public fun add_brand(
     _: &AdminCap,
     avatar: &mut LoyaltyAvatar,
@@ -188,8 +164,7 @@ public fun add_brand(
     dof::add(&mut avatar.id, key, brand_node);
 }
 
-/// Remove a brand relationship from the avatar.
-/// Deletes the BrandNode and all its attributes.
+// Deletes the BrandNode and deallocates its memory dynamically
 public fun remove_brand(
     _: &AdminCap,
     avatar: &mut LoyaltyAvatar,
@@ -210,7 +185,7 @@ public fun remove_brand(
     object::delete(id);
 }
 
-/// Add an attribute to a brand node (e.g., speed, endurance, style).
+// Extends the brand node dynamically with custom attribute sub-fields
 public fun add_attribute(
     _: &AdminCap,
     avatar: &mut LoyaltyAvatar,
@@ -237,7 +212,6 @@ public fun add_attribute(
     });
 }
 
-/// Update an existing attribute's value on a brand node.
 public fun update_attribute(
     _: &AdminCap,
     avatar: &mut LoyaltyAvatar,
@@ -264,7 +238,6 @@ public fun update_attribute(
     });
 }
 
-/// Remove an attribute from a brand node.
 public fun remove_attribute(
     _: &AdminCap,
     avatar: &mut LoyaltyAvatar,
@@ -288,7 +261,7 @@ public fun remove_attribute(
     });
 }
 
-/// Add experience points and potentially level up.
+// Experience accumulation with O(1) state mutation
 public fun gain_experience(
     _: &AdminCap,
     avatar: &mut LoyaltyAvatar,
@@ -296,11 +269,10 @@ public fun gain_experience(
 ) {
     assert!(!avatar.locked, EAvatarLocked);
     avatar.experience = avatar.experience + amount;
-    // Level up every 1000 XP
     avatar.level = 1 + (avatar.experience / 1000);
 }
 
-/// Add points to a specific brand relationship.
+// Award points to a specific brand node (tier transitions modeled mathematically)
 public fun add_brand_points(
     _: &AdminCap,
     avatar: &mut LoyaltyAvatar,
@@ -313,16 +285,10 @@ public fun add_brand_points(
 
     let brand_node: &mut BrandNode = dof::borrow_mut(&mut avatar.id, brand_key);
     brand_node.points = brand_node.points + points;
-    // Tier up every 500 points
     brand_node.tier = brand_node.points / 500;
 }
 
-/// Record a redemption against a brand's points.
-/// Increments `redeemed` (append-only) and asserts that total redeemed
-/// never exceeds total earned. The `points` field is left untouched —
-/// "lifetime earned" remains immutable, in keeping with the project's
-/// core trust property that brands cannot silently reduce earned points.
-/// Available balance is `points - redeemed`.
+// Records a redemption event, verifying available balance before updating spent counter
 public fun record_redemption(
     _: &AdminCap,
     avatar: &mut LoyaltyAvatar,
@@ -333,60 +299,58 @@ public fun record_redemption(
     let brand_key = BrandKey { brand_name };
     assert!(dof::exists_(&avatar.id, brand_key), EBrandNotFound);
 
-    let brand_node: &mut BrandNode = dof::borrow_mut(&mut avatar.id, brand_key);
-    let available = brand_node.points - brand_node.redeemed;
-    assert!(amount <= available, ERedemptionExceedsBalance);
+    // Copy avatar ID first to satisfy the Move borrow checker's single-mutable-reference invariant
+    let avatar_id = object::id(avatar);
 
-    brand_node.redeemed = brand_node.redeemed + amount;
+    let new_redeemed_total = {
+        let brand_node: &mut BrandNode = dof::borrow_mut(&mut avatar.id, brand_key);
+        let available = brand_node.points - brand_node.redeemed;
+        assert!(amount <= available, ERedemptionExceedsBalance);
+        brand_node.redeemed = brand_node.redeemed + amount;
+        brand_node.redeemed
+    };
 
     event::emit(RedemptionRecordedEvent {
-        avatar_id: object::id(avatar),
+        avatar_id,
         brand_name: brand_key.brand_name,
         amount,
-        new_redeemed_total: brand_node.redeemed,
+        new_redeemed_total,
     });
 }
 
 // === Admin Functions ===
 
-/// Lock an avatar (e.g., during a sponsored mutation).
 public fun lock_avatar(_: &AdminCap, avatar: &mut LoyaltyAvatar) {
     avatar.locked = true;
 }
 
-/// Unlock an avatar after mutation completes.
+// Unlock an avatar after mutation completes
 public fun unlock_avatar(_: &AdminCap, avatar: &mut LoyaltyAvatar) {
     avatar.locked = false;
 }
 
 // === View Functions ===
 
-/// Get the avatar's name.
 public fun name(avatar: &LoyaltyAvatar): String {
     avatar.name
 }
 
-/// Get the avatar's level.
 public fun level(avatar: &LoyaltyAvatar): u64 {
     avatar.level
 }
 
-/// Get the avatar's total experience.
 public fun experience(avatar: &LoyaltyAvatar): u64 {
     avatar.experience
 }
 
-/// Check if the avatar is locked.
 public fun is_locked(avatar: &LoyaltyAvatar): bool {
     avatar.locked
 }
 
-/// Check if a brand exists on the avatar.
 public fun has_brand(avatar: &LoyaltyAvatar, brand_name: String): bool {
     dof::exists_(&avatar.id, BrandKey { brand_name })
 }
 
-/// Get a brand node's tier.
 public fun brand_tier(avatar: &LoyaltyAvatar, brand_name: String): u64 {
     let brand_key = BrandKey { brand_name };
     assert!(dof::exists_(&avatar.id, brand_key), EBrandNotFound);
@@ -394,7 +358,6 @@ public fun brand_tier(avatar: &LoyaltyAvatar, brand_name: String): u64 {
     brand_node.tier
 }
 
-/// Get a brand node's points.
 public fun brand_redeemed(avatar: &LoyaltyAvatar, brand_name: String): u64 {
     let key = BrandKey { brand_name };
     if (!dof::exists_(&avatar.id, key)) return 0;
@@ -416,7 +379,6 @@ public fun brand_points(avatar: &LoyaltyAvatar, brand_name: String): u64 {
     brand_node.points
 }
 
-/// Get an attribute value from a brand node.
 public fun attribute_value(
     avatar: &LoyaltyAvatar,
     brand_name: String,
@@ -431,7 +393,6 @@ public fun attribute_value(
     attr.value
 }
 
-/// Get an attribute label from a brand node.
 public fun attribute_label(
     avatar: &LoyaltyAvatar,
     brand_name: String,
@@ -446,7 +407,6 @@ public fun attribute_label(
     attr.label
 }
 
-/// Check if an attribute exists on a brand node.
 public fun has_attribute(
     avatar: &LoyaltyAvatar,
     brand_name: String,
