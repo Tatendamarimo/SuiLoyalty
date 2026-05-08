@@ -2,8 +2,8 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 dotenv.config();
 
-// Debug: confirm which DB host Railway is connecting to
-const dbUrl = process.env.DATABASE_URL || '';
+// Use SUPABASE_DATABASE_URL first, fall back to DATABASE_URL for compatibility
+const dbUrl = process.env.SUPABASE_DATABASE_URL || process.env.DATABASE_URL || '';
 try {
   const host = new URL(dbUrl).hostname;
   console.log(`[DB] Connecting to host: ${host}`);
