@@ -11,8 +11,12 @@ try {
   console.error(`[DB] Invalid DATABASE_URL: "${dbUrl.slice(0, 30)}..."`);
 }
 
+// Strip sslmode from URL — we handle SSL programmatically to avoid
+// pg treating 'require' as 'verify-full' and rejecting Supabase certs.
+const cleanUrl = dbUrl.replace(/[?&]sslmode=[^&]*/g, '').replace(/\?$/, '');
+
 const pool = new Pool({
-  connectionString: dbUrl,
+  connectionString: cleanUrl,
   ssl: dbUrl.includes('supabase.com')
     ? { rejectUnauthorized: false }
     : false,
