@@ -78,7 +78,6 @@ app.use(helmet({
 const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:3000',
-  'https://sui-loyalty.vercel.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
 
