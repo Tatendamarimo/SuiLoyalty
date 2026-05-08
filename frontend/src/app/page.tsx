@@ -270,6 +270,11 @@ export default function Picker() {
         {/* ── Footer ──────────────────────────────────────────────────────── */}
         <footer style={{ marginTop: "48px", textAlign: "center", color: "var(--muted)", fontSize: "12px", animation: "fadeIn 0.8s cubic-bezier(0.4,0,0.2,1) both" }}>
           Built on the Sui Network · zkLogin authentication · Move smart contracts
+          <div style={{ marginTop: "12px", display: "flex", justifyContent: "center", gap: "16px" }}>
+            <a href="/privacy" style={{ color: "#64748b", textDecoration: "none", fontSize: "11px" }}>Privacy Policy</a>
+            <span style={{ color: "#334155" }}>·</span>
+            <a href="/terms" style={{ color: "#64748b", textDecoration: "none", fontSize: "11px" }}>Terms of Service</a>
+          </div>
         </footer>
 
       </div>
