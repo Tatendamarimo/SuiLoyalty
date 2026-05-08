@@ -1114,7 +1114,7 @@ export default function Merchant() {
             <InventoryPanel inventory={inventory} brand={activeBrand} onRefresh={refreshInventory} />
           </div>
 
-          <ReportExportCard brandId={activeBrand.brand_id} refreshTrigger={inventory?.stats?.total_codes || 0} />
+          <ReportExportCard brandId={activeBrand.brand_id} refreshTrigger={inventory?.stats?.printed || 0} />
         </div>
       </div>
 
