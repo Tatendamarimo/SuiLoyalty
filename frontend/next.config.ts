@@ -5,9 +5,6 @@ const API_URL =
 
 const nextConfig: NextConfig = {
   allowedDevOrigins: ['192.168.1.48', '192.168.1.48.nip.io', '192.168.1.165'],
-  turbopack: {
-    root: __dirname,
-  },
   async rewrites() {
     return [
       {
