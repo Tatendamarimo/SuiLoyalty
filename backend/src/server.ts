@@ -78,6 +78,7 @@ app.use(helmet({
 const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:3000',
+  'https://sui-loyalty.vercel.app',
   process.env.FRONTEND_URL,
 ].filter(Boolean) as string[];
 
@@ -299,7 +300,8 @@ app.get('/api/auth/callback', async (req, res) => {
       if (name) url.searchParams.set('name', name);
       res.redirect(url.toString());
     } else {
-      res.redirect(`http://${hostname}:3001/merchant`);
+      const frontendBase = process.env.FRONTEND_URL || 'https://sui-loyalty.vercel.app';
+      res.redirect(`${frontendBase}/merchant`);
     }
   } catch (error: any) {
     console.error('[auth/callback GET]', error);
