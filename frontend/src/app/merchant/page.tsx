@@ -752,10 +752,11 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
       .then(data => {
         if (data.success && data.campaigns) {
           setCampaigns(data.campaigns);
-          if (data.campaigns.length > 0) {
-            setSelectedCampaignId(data.campaigns[0].id);
-            setPointsPerScan(data.campaigns[0].points_per_scan);
-            setCampaignName(data.campaigns[0].name);
+          const activeCampaigns = data.campaigns.filter((c: any) => c.is_active);
+          if (activeCampaigns.length > 0) {
+            setSelectedCampaignId(activeCampaigns[0].id);
+            setPointsPerScan(activeCampaigns[0].points_per_scan);
+            setCampaignName(activeCampaigns[0].name);
           } else {
             setSelectedCampaignId("");
             setPointsPerScan(10);
@@ -882,15 +883,15 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
             <span style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Active Campaign</span>
             <CreateCampaignModal brandId={brand.brand_id} onCreated={() => setRefreshTrigger(prev => prev + 1)} />
           </div>
-          {campaigns.length === 0 ? (
-            <div style={{ fontSize: 13, color: "#64748b", padding: "4px 0" }}>Create a campaign to get started</div>
+          {campaigns.filter(c => c.is_active).length === 0 ? (
+            <div style={{ fontSize: 13, color: "#64748b", padding: "4px 0" }}>No active campaigns</div>
           ) : (
             <select 
               value={selectedCampaignId} 
               onChange={(e) => handleCampaignChange(e.target.value)}
               style={{ width: "100%", background: "none", border: "none", color: "#e2e8f0", fontSize: 13, outline: "none", cursor: "pointer" }}
             >
-              {campaigns.map((c) => (
+              {campaigns.filter(c => c.is_active).map((c) => (
                 <option key={c.id} value={c.id} style={{ background: "#0f1421" }}>
                   {c.name}
                 </option>
