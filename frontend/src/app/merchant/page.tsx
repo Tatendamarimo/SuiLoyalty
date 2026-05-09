@@ -634,12 +634,13 @@ function ReportExportCard({ brandId, refreshTrigger = 0 }: { brandId: string, re
         <select
           value={selectedCampaign}
           onChange={(e) => setSelectedCampaign(e.target.value)}
-          disabled={loading || campaigns.length === 0}
-          style={{ width: "100%", padding: "8px 12px", background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 6, color: (loading || campaigns.length === 0) ? "#475569" : "#e2e8f0", fontSize: 13, outline: "none", cursor: (loading || campaigns.length === 0) ? "not-allowed" : "pointer" }}
+          disabled={loading}
+          style={{ width: "100%", padding: "8px 12px", background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 6, color: loading ? "#475569" : "#e2e8f0", fontSize: 13, outline: "none", cursor: loading ? "not-allowed" : "pointer" }}
         >
-          <option value="">{loading ? "Loading Campaigns..." : (campaigns.length === 0 ? "No campaigns yet" : "All Campaigns")}</option>
-          {campaigns.map(c => (
-            <option key={c || 'null'} value={c || ''}>{c || 'Unnamed Campaign'}</option>
+          <option value="">{loading ? "Loading Campaigns..." : "All Campaigns (Combined)"}</option>
+          <option value="General Campaign" style={{ background: "#0f1421" }}>General Campaign (No Campaign)</option>
+          {campaigns.filter(c => c && c !== "General Campaign").map(c => (
+            <option key={c} value={c}>{c}</option>
           ))}
         </select>
       </div>
