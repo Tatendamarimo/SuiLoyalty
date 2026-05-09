@@ -222,6 +222,58 @@ function EditBrandModal({ brand, onEdited }: { brand: Membership; onEdited: () =
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Team Member states
+  const [members, setMembers] = useState<any[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+  const [newWallet, setNewWallet] = useState("");
+  const [newRole, setNewRole] = useState("operator");
+  const [inviteError, setInviteError] = useState("");
+  const [inviting, setInviting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      fetchMembers();
+    }
+  }, [open]);
+
+  async function fetchMembers() {
+    setLoadingMembers(true);
+    try {
+      const res = await fetch(`/api/brands/${brand.brand_id}/members`, { credentials: "include" });
+      const data = await res.json();
+      if (data.success) setMembers(data.members);
+    } catch (e) {
+      console.error("Failed to load members", e);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }
+
+  async function inviteMember() {
+    if (!newWallet.trim().startsWith("0x")) {
+      setInviteError("Valid wallet address starting with 0x is required");
+      return;
+    }
+    setInviting(true);
+    setInviteError("");
+    try {
+      const res = await fetch(`/api/brands/${brand.brand_id}/members`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet_address: newWallet.trim(), role: newRole }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to grant access");
+      setNewWallet("");
+      fetchMembers(); // Refresh roster
+    } catch (e: any) {
+      setInviteError(e.message);
+    } finally {
+      setInviting(false);
+    }
+  }
+
   async function update() {
     if (!name.trim()) { setError("Brand name is required"); return; }
     setLoading(true); setError("");
@@ -247,47 +299,95 @@ function EditBrandModal({ brand, onEdited }: { brand: Membership; onEdited: () =
     <>
       <button onClick={() => setOpen(true)} style={{ background: "transparent", border: "1px solid #334155", borderRadius: 6, padding: "6px 12px", color: "#94a3b8", fontSize: 12, fontWeight: 600, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 }}>
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        Settings
+        Brand Settings
       </button>
       {open && (
-        <div onClick={() => { setOpen(false); setError(""); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 14, padding: 32, width: "100%", maxWidth: 420 }}>
-            <h2 style={{ fontSize: 18, fontWeight: 700, color: "#e2e8f0", marginBottom: 20 }}>Edit Brand</h2>
-            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Brand name *</label>
-                <input value={name} disabled
-                  title="Brand names cannot be changed after creation because they are permanently recorded on the blockchain."
-                  style={{ width: "100%", marginTop: 6, padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid #1f2937", borderRadius: 8, color: "#64748b", fontSize: 14, outline: "none", boxSizing: "border-box", cursor: "not-allowed" }} />
-                <div style={{ fontSize: 10, color: "#475569", marginTop: 4 }}>
-                  Locked to preserve on-chain blockchain integrity.
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Category</label>
-                <input value={category} onChange={(e) => setCategory(e.target.value)}
-                  placeholder="e.g. Coffee, Retail, Food"
-                  style={{ width: "100%", marginTop: 6, padding: "10px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
-              </div>
-              <div>
-                <label style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Brand colour</label>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
-                  <input type="color" value={color} onChange={(e) => setColor(e.target.value)}
-                    style={{ width: 40, height: 40, border: "1px solid #334155", borderRadius: 8, background: "none", cursor: "pointer", padding: 2 }} />
-                  <span style={{ fontSize: 13, color: "#94a3b8", fontFamily: "monospace" }}>{color}</span>
-                </div>
-              </div>
-              {error && <p style={{ color: "#fca5a5", fontSize: 12, margin: 0 }}>{error}</p>}
+        <div onClick={() => { setOpen(false); setError(""); setInviteError(""); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", backdropFilter: "blur(12px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 16, width: "100%", maxWidth: 680, display: "flex", flexDirection: "column", maxHeight: "90vh", overflow: "hidden", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)" }}>
+            
+            {/* Modal Header */}
+            <div style={{ padding: "20px 24px", borderBottom: "1px solid #1f2937", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <h2 style={{ fontSize: 18, fontWeight: 700, color: "#e2e8f0", margin: 0 }}>Brand Settings</h2>
+              <button onClick={() => { setOpen(false); }} style={{ background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center", padding: 0, width: 32, height: 32, borderRadius: "50%" }} onMouseEnter={(e) => e.currentTarget.style.color = "#e2e8f0"} onMouseLeave={(e) => e.currentTarget.style.color = "#64748b"}>&times;</button>
             </div>
-            <div style={{ display: "flex", gap: 8, marginTop: 24 }}>
-              <button onClick={update} disabled={loading} style={{
-                flex: 1, padding: "11px", background: loading ? "#334155" : brand.brand_color,
-                border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "wait" : "pointer",
-              }}>{loading ? "Saving…" : "Save changes"}</button>
-              <button onClick={() => { setOpen(false); setError(""); }} style={{
-                padding: "11px 16px", background: "transparent", border: "1px solid #334155",
-                borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer",
-              }}>Cancel</button>
+
+            {/* Split Panel Body */}
+            <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+              
+              {/* Left Side: Brand Profile Settings */}
+              <div style={{ flex: 1, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 20, borderRight: "1px solid #1f2937" }}>
+                 <div>
+                   <h3 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: brand.brand_color, margin: "0 0 16px 0", fontWeight: 700 }}>Profile Configuration</h3>
+                   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                     <div>
+                       <label style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Brand Name</label>
+                       <input value={name} disabled style={{ width: "100%", marginTop: 6, padding: "10px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid #1f2937", borderRadius: 8, color: "#64748b", fontSize: 14, outline: "none", boxSizing: "border-box", cursor: "not-allowed" }} />
+                       <div style={{ fontSize: 10, color: "#475569", marginTop: 4 }}>Immutable on-chain core record.</div>
+                     </div>
+                     <div>
+                       <label style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Category</label>
+                       <input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="e.g. Retail, Coffee Shop" style={{ width: "100%", marginTop: 6, padding: "10px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+                     </div>
+                     <div>
+                       <label style={{ fontSize: 11, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Brand Theme Color</label>
+                       <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+                         <div style={{ position: "relative", width: 40, height: 40, borderRadius: 8, overflow: "hidden", border: "1px solid #334155" }}>
+                           <input type="color" value={color} onChange={(e) => setColor(e.target.value)} style={{ position: "absolute", top: "-50%", left: "-50%", width: "200%", height: "200%", cursor: "pointer", border: "none", padding: 0 }} />
+                         </div>
+                         <span style={{ fontSize: 13, color: "#94a3b8", fontFamily: "monospace", background: "#0a0e1a", padding: "4px 8px", borderRadius: 6, border: "1px solid #1f2937" }}>{color.toUpperCase()}</span>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+                 {error && <div style={{ background: "rgba(239, 68, 68, 0.1)", border: "1px solid rgba(239, 68, 68, 0.2)", color: "#fca5a5", fontSize: 12, padding: 10, borderRadius: 8 }}>{error}</div>}
+                 <div style={{ marginTop: "auto", paddingTop: 10 }}>
+                   <button onClick={update} disabled={loading} style={{ width: "100%", padding: "12px", background: loading ? "#334155" : brand.brand_color, border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "wait" : "pointer", transition: "opacity 0.2s" }} onMouseEnter={(e) => e.currentTarget.style.opacity = "0.9"} onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}>{loading ? "Saving..." : "Save Profile Changes"}</button>
+                 </div>
+              </div>
+
+              {/* Right Side: Team Access Management */}
+              <div style={{ flex: 1.2, overflowY: "auto", padding: 24, display: "flex", flexDirection: "column", gap: 20, background: "#0a0e1a" }}>
+                 <div>
+                   <h3 style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: 1.5, color: "#10b981", margin: "0 0 16px 0", fontWeight: 700 }}>Team Access Control</h3>
+                   
+                   <div style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 10, padding: 14, display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                     <label style={{ fontSize: 10, color: "#94a3b8", fontWeight: 600 }}>GRANT NEW ACCESS</label>
+                     <div style={{ display: "flex", gap: 8 }}>
+                       <input value={newWallet} onChange={(e) => setNewWallet(e.target.value)} placeholder="Enter Sui Wallet Address (0x...)" style={{ flex: 1, padding: "10px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                       <select value={newRole} onChange={(e) => setNewRole(e.target.value)} style={{ background: "#0a0e1a", border: "1px solid #334155", color: "#e2e8f0", fontSize: 13, borderRadius: 8, padding: "0 12px", outline: "none", cursor: "pointer" }}>
+                         <option value="operator">Operator</option>
+                         <option value="admin">Admin</option>
+                       </select>
+                     </div>
+                     <button onClick={inviteMember} disabled={inviting || !newWallet.trim()} style={{ padding: "10px", background: inviting ? "#334155" : "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.3)", color: "#34d399", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: inviting ? "wait" : (!newWallet.trim() ? "not-allowed" : "pointer"), transition: "background 0.2s" }}>{inviting ? "Provisioning..." : "+ Provision Access"}</button>
+                     {inviteError && <div style={{ color: "#fca5a5", fontSize: 11, marginTop: 2, padding: "0 4px" }}>{inviteError}</div>}
+                   </div>
+
+                   <div style={{ borderTop: "1px solid #1f2937", paddingTop: 16 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                        <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 1, fontWeight: 600 }}>Current Roster</label>
+                        <span style={{ fontSize: 10, background: "#1f2937", color: "#94a3b8", padding: "2px 6px", borderRadius: 10 }}>{members.length} total</span>
+                      </div>
+                      
+                      {loadingMembers ? (
+                        <div style={{ fontSize: 12, color: "#64748b", padding: "12px 0", textAlign: "center" }}>Loading team roster...</div>
+                      ) : (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          {members.map((m, i) => (
+                            <div key={i} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 8, padding: "10px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                               <div style={{ minWidth: 0 }}>
+                                 <div style={{ fontSize: 13, fontWeight: 600, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.display_name || "External Operator"}</div>
+                                 <div style={{ fontSize: 11, color: "#64748b", fontFamily: "monospace", marginTop: 2 }}>{m.wallet_address.slice(0, 6)}...{m.wallet_address.slice(-4)}</div>
+                               </div>
+                               <span style={{ fontSize: 9, textTransform: "uppercase", fontWeight: 800, letterSpacing: 0.5, color: m.role === "owner" ? "#f59e0b" : (m.role === "admin" ? "#c084fc" : "#94a3b8"), background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.05)", padding: "3px 8px", borderRadius: 6 }}>{m.role}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                   </div>
+                 </div>
+              </div>
+
             </div>
           </div>
         </div>
