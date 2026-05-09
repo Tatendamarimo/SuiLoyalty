@@ -41,7 +41,7 @@ router.get('/', async (req: any, res: Response) => {
          COUNT(qt.id) FILTER (WHERE qt.printed = true)::int AS printed_tokens
        FROM campaigns c
        LEFT JOIN qr_tokens qt ON qt.campaign_id = c.id
-       WHERE c.brand_id = $1
+       WHERE c.brand_id = $1 AND c.is_archived = FALSE
        GROUP BY c.id
        ORDER BY c.created_at DESC`,
       [brandId]
@@ -237,7 +237,7 @@ router.delete('/:id', async (req: any, res: Response) => {
     }
 
     const result = await pool.query(
-      'UPDATE campaigns SET is_active = false, updated_at = NOW() WHERE id = $1 RETURNING *',
+      'UPDATE campaigns SET is_active = false, is_archived = true, updated_at = NOW() WHERE id = $1 RETURNING *',
       [id]
     );
 
