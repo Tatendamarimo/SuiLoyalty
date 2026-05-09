@@ -713,30 +713,30 @@ function CreateCampaignModal({ brandId, onCreated }: { brandId: string; onCreate
         + New
       </button>
       {open && (
-        <div onClick={() => { setOpen(false); setError(""); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 14, padding: 32, width: "100%", maxWidth: 420, maxHeight: "90vh", overflowY: "auto" }}>
+        <div onClick={() => { setOpen(false); setError(""); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 14, padding: "24px 20px", width: "100%", maxWidth: 420, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)" }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e2e8f0", marginBottom: 18 }}>Create Campaign</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Campaign name *</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Promo" style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                <div style={{ flex: "1 1 170px" }}>
                   <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Points/scan *</label>
                   <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                 </div>
-                <div>
+                <div style={{ flex: "1 1 170px" }}>
                   <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>QR Expiry (Hours)</label>
                   <input type="number" value={expiresHours} onChange={(e) => setExpiresHours(e.target.value)} placeholder="e.g. 24" style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                 </div>
               </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                <div style={{ flex: "1 1 170px" }}>
                   <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Start Date</label>
                   <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                 </div>
-                <div>
+                <div style={{ flex: "1 1 170px" }}>
                   <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>End Date</label>
                   <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
                 </div>
