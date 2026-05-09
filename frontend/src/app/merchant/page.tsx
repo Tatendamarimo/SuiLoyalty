@@ -672,6 +672,9 @@ function CreateCampaignModal({ brandId, onCreated }: { brandId: string; onCreate
   const [name, setName] = useState("");
   const [points, setPoints] = useState(10);
   const [description, setDescription] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
+  const [expiresHours, setExpiresHours] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -683,11 +686,19 @@ function CreateCampaignModal({ brandId, onCreated }: { brandId: string; onCreate
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), brandId, points_per_scan: points, description }),
+        body: JSON.stringify({ 
+          name: name.trim(), 
+          brandId, 
+          points_per_scan: points, 
+          description,
+          starts_at: startsAt ? new Date(startsAt).toISOString() : null,
+          ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+          expires_hours: expiresHours ? Number(expiresHours) : null
+        }),
       });
       const data = await res.json();
       if (!data.success) throw new Error(data.error || "Failed to create campaign");
-      setOpen(false); setName(""); setPoints(10); setDescription("");
+      setOpen(false); setName(""); setPoints(10); setDescription(""); setStartsAt(""); setEndsAt(""); setExpiresHours("");
       onCreated();
     } catch (e: any) {
       setError(e.message);
@@ -703,16 +714,32 @@ function CreateCampaignModal({ brandId, onCreated }: { brandId: string; onCreate
       </button>
       {open && (
         <div onClick={() => { setOpen(false); setError(""); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 14, padding: 32, width: "100%", maxWidth: 400 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 14, padding: 32, width: "100%", maxWidth: 420, maxHeight: "90vh", overflowY: "auto" }}>
             <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e2e8f0", marginBottom: 18 }}>Create Campaign</h2>
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Campaign name *</label>
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Promo" style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
               </div>
-              <div>
-                <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Points per scan *</label>
-                <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Points/scan *</label>
+                  <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>QR Expiry (Hours)</label>
+                  <input type="number" value={expiresHours} onChange={(e) => setExpiresHours(e.target.value)} placeholder="e.g. 24" style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div>
+                  <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Start Date</label>
+                  <input type="datetime-local" value={startsAt} onChange={(e) => setStartsAt(e.target.value)} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>End Date</label>
+                  <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                </div>
               </div>
               <div>
                 <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Description</label>
