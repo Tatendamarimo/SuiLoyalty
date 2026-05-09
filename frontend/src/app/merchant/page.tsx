@@ -667,6 +667,70 @@ function ReportExportCard({ brandId, refreshTrigger = 0 }: { brandId: string, re
 
 // ─── QR generation card (tightened version of original) ────────────────────
 
+function CreateCampaignModal({ brandId, onCreated }: { brandId: string; onCreated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [points, setPoints] = useState(10);
+  const [description, setDescription] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function create() {
+    if (!name.trim()) { setError("Campaign name is required"); return; }
+    setLoading(true); setError("");
+    try {
+      const res = await fetch("/api/brand/campaigns", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), brandId, points_per_scan: points, description }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to create campaign");
+      setOpen(false); setName(""); setPoints(10); setDescription("");
+      onCreated();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={{ background: "transparent", border: "1px solid #334155", borderRadius: 6, padding: "3px 8px", color: "#6366f1", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+        + New
+      </button>
+      {open && (
+        <div onClick={() => { setOpen(false); setError(""); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 14, padding: 32, width: "100%", maxWidth: 400 }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e2e8f0", marginBottom: 18 }}>Create Campaign</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Campaign name *</label>
+                <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer Promo" style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Points per scan *</label>
+                <input type="number" value={points} onChange={(e) => setPoints(Number(e.target.value))} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Description</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Campaign details..." style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box", height: 60, resize: "none" }} />
+              </div>
+              {error && <p style={{ color: "#fca5a5", fontSize: 11, margin: 0 }}>{error}</p>}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <button onClick={create} disabled={loading} style={{ flex: 1, padding: "10px", background: loading ? "#334155" : "#6366f1", border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "wait" : "pointer" }}>{loading ? "Creating…" : "Create"}</button>
+              <button onClick={() => { setOpen(false); setError(""); }} style={{ padding: "10px 14px", background: "transparent", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
   brand: Membership; qrLoaded: boolean; onGenerated: () => void; showToast: (m: string, t?: "success" | "error") => void;
 }) {
@@ -677,6 +741,39 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
   const [tokens, setTokens] = useState<QRToken[]>([]);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [selectedCampaignId, setSelectedCampaignId] = useState<string>("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    fetch(`/api/brand/campaigns?brandId=${brand.brand_id}`, { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.campaigns) {
+          setCampaigns(data.campaigns);
+          if (data.campaigns.length > 0) {
+            setSelectedCampaignId(data.campaigns[0].id);
+            setPointsPerScan(data.campaigns[0].points_per_scan);
+            setCampaignName(data.campaigns[0].name);
+          } else {
+            setSelectedCampaignId("");
+            setPointsPerScan(10);
+            setCampaignName("General Campaign");
+          }
+        }
+      })
+      .catch(err => console.error("Failed to fetch campaigns", err));
+  }, [brand.brand_id, refreshTrigger]);
+
+  const handleCampaignChange = (campaignId: string) => {
+    setSelectedCampaignId(campaignId);
+    const selected = campaigns.find(c => c.id === campaignId);
+    if (selected) {
+      setPointsPerScan(selected.points_per_scan);
+      setCampaignName(selected.name);
+    }
+  };
 
   async function generateBatch() {
     setLoading(true);
@@ -696,7 +793,8 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
           brand_id: brand.brand_id, 
           points_value: pointsPerScan, 
           campaign_name: campaignName,
-          expires_in_days: expiryDays > 0 ? expiryDays : null
+          expires_in_days: expiryDays > 0 ? expiryDays : null,
+          campaign_id: selectedCampaignId || null
         }),
       });
       const data = await res.json();
@@ -780,10 +878,25 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
 
       <div className="merchant-split-grid" style={{ marginBottom: 12, gap: 12 }}>
         <div style={{ background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8, padding: 12 }}>
-          <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>Campaign Name</div>
-          <input type="text" value={campaignName} onChange={(e) => setCampaignName(e.target.value)}
-            placeholder="e.g. Summer Promo 2026"
-            style={{ width: "100%", background: "none", border: "none", color: "#e2e8f0", fontSize: 13, outline: "none" }} />
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+            <span style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Active Campaign</span>
+            <CreateCampaignModal brandId={brand.brand_id} onCreated={() => setRefreshTrigger(prev => prev + 1)} />
+          </div>
+          {campaigns.length === 0 ? (
+            <div style={{ fontSize: 13, color: "#64748b", padding: "4px 0" }}>Create a campaign to get started</div>
+          ) : (
+            <select 
+              value={selectedCampaignId} 
+              onChange={(e) => handleCampaignChange(e.target.value)}
+              style={{ width: "100%", background: "none", border: "none", color: "#e2e8f0", fontSize: 13, outline: "none", cursor: "pointer" }}
+            >
+              {campaigns.map((c) => (
+                <option key={c.id} value={c.id} style={{ background: "#0f1421" }}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div style={{ background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8, padding: 12 }}>
           <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>QR Expiry</div>

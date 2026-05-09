@@ -19,6 +19,7 @@ import { generateEphemeralKeypair, deriveSalt, computeSuiAddress } from './servi
 import { getLoyaltyAvatar } from './services/nft.service.js';
 import { createRedemptionRequest } from './services/redemption.service.js';
 import brandRouter from './routes/brand.routes.js';
+import campaignRouter from './routes/campaign.routes.js';
 import pool from './config/database.js';
 
 // --- Auto Migration ---
@@ -117,6 +118,7 @@ app.use(session({
 
 // ─── Brand-portal operator routes ─────────────────────────────────────────────
 app.use('/api/brand', brandRouter);
+app.use('/api/brand/campaigns', campaignRouter);
 
 // ─── Health ──────────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
@@ -576,8 +578,8 @@ app.get('/api/qr/brand/:brand_id', async (req, res) => {
 // ─── QR: generate ─────────────────────────────────────────────────────────────
 app.post('/api/qr/generate', async (req, res) => {
   try {
-    const { brand_id, points_value, campaign_name, expires_in_days } = req.body;
-    const token = await generateQRToken(brand_id, points_value, campaign_name, expires_in_days);
+    const { brand_id, points_value, campaign_name, expires_in_days, campaign_id } = req.body;
+    const token = await generateQRToken(brand_id, points_value, campaign_name, expires_in_days, campaign_id);
     res.status(201).json({ success: true, token });
   } catch (error: any) {
     res.status(500).json({ success: false, error: 'Failed to generate token' });

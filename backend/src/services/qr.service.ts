@@ -3,7 +3,7 @@ import pool from '../config/database.js';
 import { mintAvatarOnChain, addBrandToAvatarOnChain, addBrandPointsOnChain } from './blockchain.service.js';
 
 // Generates a cryptographically secure token (UUID v4) to prevent enumeration attacks.
-export async function generateQRToken(brand_id?: string, points_value?: number, campaign_name?: string, expires_in_days?: number) {
+export async function generateQRToken(brand_id?: string, points_value?: number, campaign_name?: string, expires_in_days?: number, campaign_id?: string) {
   const token_uuid = randomUUID();
   
   let expiresAt: Date | null = null;
@@ -13,10 +13,10 @@ export async function generateQRToken(brand_id?: string, points_value?: number, 
   }
 
   const result = await pool.query(
-    `INSERT INTO qr_tokens (token_uuid, expires_at, brand_id, points_value, campaign_name)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO qr_tokens (token_uuid, expires_at, brand_id, points_value, campaign_name, campaign_id)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [token_uuid, expiresAt, brand_id || null, points_value ?? 10, campaign_name || 'General Campaign']
+    [token_uuid, expiresAt, brand_id || null, points_value ?? 10, campaign_name || 'General Campaign', campaign_id || null]
   );
 
   return result.rows[0];
