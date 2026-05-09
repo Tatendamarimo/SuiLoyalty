@@ -858,16 +858,6 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
       .then(data => {
         if (data.success && data.campaigns) {
           setCampaigns(data.campaigns);
-          const activeCampaigns = data.campaigns.filter((c: any) => c.is_active);
-          if (activeCampaigns.length > 0) {
-            setSelectedCampaignId(activeCampaigns[0].id);
-            setPointsPerScan(activeCampaigns[0].points_per_scan);
-            setCampaignName(activeCampaigns[0].name);
-          } else {
-            setSelectedCampaignId("");
-            setPointsPerScan(10);
-            setCampaignName("General Campaign");
-          }
         }
       })
       .catch(err => console.error("Failed to fetch campaigns", err));
@@ -875,6 +865,11 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
 
   const handleCampaignChange = (campaignId: string) => {
     setSelectedCampaignId(campaignId);
+    if (!campaignId) {
+      setPointsPerScan(10);
+      setCampaignName("General Campaign");
+      return;
+    }
     const selected = campaigns.find(c => c.id === campaignId);
     if (selected) {
       setPointsPerScan(selected.points_per_scan);
@@ -989,34 +984,43 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
             <span style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600 }}>Active Campaign</span>
             <CreateCampaignModal brandId={brand.brand_id} onCreated={() => setRefreshTrigger(prev => prev + 1)} />
           </div>
-          {campaigns.filter(c => c.is_active).length === 0 ? (
-            <div style={{ fontSize: 13, color: "#64748b", padding: "4px 0" }}>No active campaigns</div>
-          ) : (
-            <select 
-              value={selectedCampaignId} 
-              onChange={(e) => handleCampaignChange(e.target.value)}
-              style={{ width: "100%", background: "none", border: "none", color: "#e2e8f0", fontSize: 13, outline: "none", cursor: "pointer" }}
-            >
-              {campaigns.filter(c => c.is_active).map((c) => (
-                <option key={c.id} value={c.id} style={{ background: "#0f1421" }}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-        <div style={{ background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8, padding: 12 }}>
-          <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>QR Expiry</div>
           <select 
-            value={expiryDays} 
-            onChange={(e) => setExpiryDays(Number(e.target.value))}
+            value={selectedCampaignId} 
+            onChange={(e) => handleCampaignChange(e.target.value)}
             style={{ width: "100%", background: "none", border: "none", color: "#e2e8f0", fontSize: 13, outline: "none", cursor: "pointer" }}
           >
-            <option value={0} style={{ background: "#0f1421" }}>Never Expires</option>
-            <option value={7} style={{ background: "#0f1421" }}>7 Days</option>
-            <option value={30} style={{ background: "#0f1421" }}>30 Days</option>
-            <option value={90} style={{ background: "#0f1421" }}>90 Days</option>
-            <option value={365} style={{ background: "#0f1421" }}>1 Year</option>
+            <option value="" style={{ background: "#0f1421" }}>None (General QR Codes)</option>
+            {campaigns.filter(c => c.is_active).map((c) => (
+              <option key={c.id} value={c.id} style={{ background: "#0f1421" }}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div style={{ background: selectedCampaignId ? "rgba(255,255,255,0.02)" : "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8, padding: 12 }}>
+          <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>QR Expiry</div>
+          <select 
+            value={selectedCampaignId ? "" : expiryDays} 
+            disabled={!!selectedCampaignId}
+            onChange={(e) => setExpiryDays(Number(e.target.value))}
+            style={{ 
+              width: "100%", background: "none", border: "none", 
+              color: selectedCampaignId ? "#64748b" : "#e2e8f0", 
+              fontSize: 13, outline: "none", 
+              cursor: selectedCampaignId ? "not-allowed" : "pointer" 
+            }}
+          >
+            {selectedCampaignId ? (
+              <option value="" style={{ background: "#0f1421" }}>Inherited from campaign</option>
+            ) : (
+              <>
+                <option value={0} style={{ background: "#0f1421" }}>Never Expires</option>
+                <option value={7} style={{ background: "#0f1421" }}>7 Days</option>
+                <option value={30} style={{ background: "#0f1421" }}>30 Days</option>
+                <option value={90} style={{ background: "#0f1421" }}>90 Days</option>
+                <option value={365} style={{ background: "#0f1421" }}>1 Year</option>
+              </>
+            )}
           </select>
         </div>
       </div>
