@@ -31,11 +31,19 @@ export async function validateQRToken(token_uuid: string, user_id: string) {
 
     // Claim the token atomically using an UPDATE lock to prevent race conditions (double-scan)
     const tokenResult = await client.query(
-      `UPDATE qr_tokens
+      `UPDATE qr_tokens qt
        SET used = TRUE, used_by = $2, used_at = NOW()
-       WHERE token_uuid = $1
-       AND used = FALSE
-       AND (expires_at IS NULL OR expires_at > NOW())
+       WHERE qt.token_uuid = $1
+       AND qt.used = FALSE
+       AND (qt.expires_at IS NULL OR qt.expires_at > NOW())
+       AND (
+         qt.campaign_id IS NULL
+         OR EXISTS (
+           SELECT 1 FROM campaigns c
+           WHERE c.id = qt.campaign_id
+           AND c.is_active = TRUE
+         )
+       )
        RETURNING *`,
       [token_uuid, user_id]
     );
