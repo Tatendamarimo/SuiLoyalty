@@ -457,15 +457,31 @@ app.post('/api/brands/:brand_id/members', async (req, res) => {
       return res.status(400).json({ success: false, error: 'Valid wallet_address required' });
     }
 
-    // Look up or create the target user
+    // Safety Check: Prevent self-invite/self-demotion
+    const currentCaller = await pool.query(`SELECT wallet_address FROM users WHERE id = $1`, [req.session.userId]);
+    const normalizedAddress = wallet_address.toLowerCase();
+    if (currentCaller.rows[0]?.wallet_address.toLowerCase() === normalizedAddress) {
+      return res.status(400).json({ success: false, error: 'You are already the owner of this brand!' });
+    }
+
+    // Look up or auto-create the target user
+    let targetUserId: string;
     const userResult = await pool.query<{ id: string }>(
       `SELECT id FROM users WHERE wallet_address = $1`,
       [wallet_address],
     );
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ success: false, error: 'No account found for that wallet address — they must sign in first' });
+
+    if (userResult.rows.length > 0) {
+      targetUserId = userResult.rows[0].id;
+    } else {
+      // Auto-generate account for new user if doesn't exist!
+      const newUser = await pool.query(
+        `INSERT INTO users (wallet_address, display_name, created_at)
+         VALUES ($1, $2, NOW()) RETURNING id`,
+        [wallet_address, 'Pending Onboard'],
+      );
+      targetUserId = newUser.rows[0].id;
     }
-    const targetUserId = userResult.rows[0]!.id;
 
     await pool.query(
       `INSERT INTO brand_members (user_id, brand_id, role)
