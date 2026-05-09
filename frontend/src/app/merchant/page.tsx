@@ -915,18 +915,32 @@ function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
       </div>
 
       <div className="merchant-split-grid" style={{ marginBottom: 14, gap: 12 }}>
-        {[
-          { label: "Number of codes", value: quantity, min: 1, max: 50, set: setQuantity },
-          { label: "Points per scan", value: pointsPerScan, min: 1, max: 1000, set: setPointsPerScan },
-        ].map(({ label, value, min, max, set }) => (
-          <div key={label} style={{ background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8, padding: 12 }}>
-            <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>{label}</div>
-            <input type="number" min={min} max={max} value={value}
-              onChange={(e) => set(Number(e.target.value))}
-              style={{ width: "100%", background: "transparent", border: "none", color: brand.brand_color, fontSize: 22, fontWeight: 700, outline: "none" }}
-            />
-          </div>
-        ))}
+        <div style={{ background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8, padding: 12 }}>
+          <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>Number of codes</div>
+          <input type="number" min={1} max={50} value={quantity}
+            onChange={(e) => setQuantity(Number(e.target.value))}
+            style={{ width: "100%", background: "transparent", border: "none", color: brand.brand_color, fontSize: 22, fontWeight: 700, outline: "none" }}
+          />
+        </div>
+        <div style={{ background: selectedCampaignId ? "rgba(255,255,255,0.02)" : "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8, padding: 12, position: "relative" }}>
+          <div style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", letterSpacing: 0.5, fontWeight: 600, marginBottom: 6 }}>Points per scan</div>
+          <input type="number" min={1} max={1000} value={pointsPerScan}
+            disabled={!!selectedCampaignId}
+            onChange={(e) => setPointsPerScan(Number(e.target.value))}
+            style={{ 
+              width: "100%", background: "transparent", border: "none", 
+              color: selectedCampaignId ? "#64748b" : brand.brand_color, 
+              fontSize: 22, fontWeight: 700, outline: "none",
+              cursor: selectedCampaignId ? "not-allowed" : "text"
+            }} 
+            title={selectedCampaignId ? "Locked to selected campaign points value" : ""}
+          />
+          {selectedCampaignId && (
+            <div style={{ fontSize: 9, color: "#475569", marginTop: 2 }}>
+              Inherited from campaign settings
+            </div>
+          )}
+        </div>
       </div>
 
       <button disabled={loading} onClick={generateBatch} style={{
