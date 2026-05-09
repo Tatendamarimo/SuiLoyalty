@@ -999,10 +999,133 @@ function GoogleIcon() {
   );
 }
 
+// ─── Campaigns Panel ────────────────────────────────────────────────────────
+
+function CampaignsPanel({ brand, showToast }: { brand: Membership; showToast: (m: string, t?: "success" | "error") => void }) {
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/brand/campaigns?brandId=${brand.brand_id}`, { credentials: "include" })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.campaigns) {
+          setCampaigns(data.campaigns);
+        }
+      })
+      .catch(err => console.error("Failed to load campaigns", err))
+      .finally(() => setLoading(false));
+  }, [brand.brand_id, refreshTrigger]);
+
+  const toggleCampaign = async (id: string, currentStatus: boolean) => {
+    try {
+      const res = await fetch(`/api/brand/campaigns/${id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: !currentStatus })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Campaign status updated.", "success");
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        showToast(data.error || "Failed to update campaign", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message, "error");
+    }
+  };
+
+  const deleteCampaign = async (id: string) => {
+    if (!confirm("Are you sure you want to deactivate/delete this campaign?")) return;
+    try {
+      const res = await fetch(`/api/brand/campaigns/${id}`, {
+        method: "DELETE",
+        credentials: "include"
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Campaign deactivated.", "success");
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        showToast(data.error || "Failed to delete campaign", "error");
+      }
+    } catch (err: any) {
+      showToast(err.message, "error");
+    }
+  };
+
+  return (
+    <div style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 10, padding: 18, marginBottom: 24 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0" }}>Campaigns list</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Manage marketing campaigns for {brand.brand_name} — {campaigns.length}</div>
+        </div>
+        <CreateCampaignModal brandId={brand.brand_id} onCreated={() => setRefreshTrigger(prev => prev + 1)} />
+      </div>
+
+      {loading ? (
+        <div style={{ fontSize: 12, color: "#64748b", padding: 16, textAlign: "center" }}>Loading…</div>
+      ) : campaigns.length === 0 ? (
+        <div style={{ fontSize: 12, color: "#64748b", padding: 24, textAlign: "center", background: "#0a0e1a", borderRadius: 8 }}>
+          No active campaigns. Use "+ New" to create your first customer acquisition campaign.
+        </div>
+      ) : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {campaigns.map((c) => (
+            <div key={c.id} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 16, background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8 }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 6 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{c.name}</div>
+                  <span style={{ 
+                    background: c.is_active ? "rgba(16,185,129,0.15)" : "rgba(100,116,139,0.15)", 
+                    color: c.is_active ? "#10b981" : "#64748b", 
+                    fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4, textTransform: "uppercase" 
+                  }}>
+                    {c.is_active ? "Active" : "Inactive"}
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, marginBottom: 12 }}>
+                  {c.description || "No description provided."}
+                </div>
+              </div>
+              <div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#94a3b8", borderTop: "1px solid #1f2937", paddingTop: 10, marginTop: 10 }}>
+                  <span>Points Value:</span>
+                  <span style={{ fontWeight: 700, color: brand.brand_color }}>{c.points_per_scan} pts/scan</span>
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+                  <button onClick={() => toggleCampaign(c.id, c.is_active)} style={{
+                    flex: 1, background: "transparent", border: "1px solid #334155", borderRadius: 6, padding: "5px 10px",
+                    color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  }}>
+                    {c.is_active ? "Deactivate" : "Activate"}
+                  </button>
+                  <button onClick={() => deleteCampaign(c.id)} style={{
+                    background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, padding: "5px 10px",
+                    color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer",
+                  }}>
+                    Archive
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ─────────────────────────────────────────────────────────
 
 export default function Merchant() {
   const [authState, setAuthState] = useState<AuthState>("loading");
+  const [activeTab, setActiveTab] = useState<"overview" | "campaigns">("overview");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -1219,16 +1342,44 @@ export default function Merchant() {
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px" }}>
         <SummaryTiles summary={summary} brand={activeBrand} />
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 0 }}>
-          <PendingRedemptionsPanel brandId={activeBrand.brand_id} onChange={refreshSummary} showToast={showToast} />
-
-          <div className="merchant-split-grid">
-            <QRGenerationCard brand={activeBrand} qrLoaded={qrLoaded} onGenerated={refreshInventory} showToast={showToast} />
-            <InventoryPanel inventory={inventory} brand={activeBrand} onRefresh={refreshInventory} />
-          </div>
-
-          <ReportExportCard brandId={activeBrand.brand_id} refreshTrigger={inventory?.stats?.printed || 0} />
+        {/* Sleek Tab Bar */}
+        <div style={{ display: "flex", gap: 16, borderBottom: "1px solid #1f2937", marginBottom: 24, paddingBottom: 2 }}>
+          <button 
+            onClick={() => setActiveTab("overview")} 
+            style={{ 
+              background: "none", border: "none", padding: "8px 16px", color: activeTab === "overview" ? activeBrand.brand_color : "#64748b", 
+              fontWeight: 600, fontSize: 13, cursor: "pointer", borderBottom: activeTab === "overview" ? `2px solid ${activeBrand.brand_color}` : "none",
+              transition: "all 0.15s"
+            }}
+          >
+            Overview
+          </button>
+          <button 
+            onClick={() => setActiveTab("campaigns")} 
+            style={{ 
+              background: "none", border: "none", padding: "8px 16px", color: activeTab === "campaigns" ? activeBrand.brand_color : "#64748b", 
+              fontWeight: 600, fontSize: 13, cursor: "pointer", borderBottom: activeTab === "campaigns" ? `2px solid ${activeBrand.brand_color}` : "none",
+              transition: "all 0.15s"
+            }}
+          >
+            Campaigns
+          </button>
         </div>
+
+        {activeTab === "overview" ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 0 }}>
+            <PendingRedemptionsPanel brandId={activeBrand.brand_id} onChange={refreshSummary} showToast={showToast} />
+
+            <div className="merchant-split-grid">
+              <QRGenerationCard brand={activeBrand} qrLoaded={qrLoaded} onGenerated={refreshInventory} showToast={showToast} />
+              <InventoryPanel inventory={inventory} brand={activeBrand} onRefresh={refreshInventory} />
+            </div>
+
+            <ReportExportCard brandId={activeBrand.brand_id} refreshTrigger={inventory?.stats?.printed || 0} />
+          </div>
+        ) : (
+          <CampaignsPanel brand={activeBrand} showToast={showToast} />
+        )}
       </div>
 
       <ToastContainer toasts={toasts} onDismiss={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />
