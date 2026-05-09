@@ -1101,62 +1101,107 @@ function CampaignsPanel({ brand, showToast }: { brand: Membership; showToast: (m
   };
 
   return (
-    <div style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 10, padding: 18, marginBottom: 24 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
+    <div style={{ background: "rgba(15,20,33,0.45)", backdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 16, padding: 24, marginBottom: 24, boxShadow: "0 20px 40px -15px rgba(0,0,0,0.5)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#e2e8f0" }}>Campaigns list</div>
-          <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>Manage marketing campaigns for {brand.brand_name} — {campaigns.length}</div>
+          <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff", margin: 0, letterSpacing: "-0.02em", background: "linear-gradient(90deg, #fff, #94a3b8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Active Campaigns</h3>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>Monitor and manage real-time promotional performance for {brand.brand_name}</div>
         </div>
         <CreateCampaignModal brandId={brand.brand_id} onCreated={() => setRefreshTrigger(prev => prev + 1)} />
       </div>
 
       {loading ? (
-        <div style={{ fontSize: 12, color: "#64748b", padding: 16, textAlign: "center" }}>Loading…</div>
+        <div style={{ display: "flex", justifyContent: "center", padding: 40, color: "#64748b", fontSize: 13 }}>Loading analytics…</div>
       ) : campaigns.length === 0 ? (
-        <div style={{ fontSize: 12, color: "#64748b", padding: 24, textAlign: "center", background: "#0a0e1a", borderRadius: 8 }}>
-          No active campaigns. Use "+ New" to create your first customer acquisition campaign.
+        <div style={{ fontSize: 13, color: "#64748b", padding: 40, textAlign: "center", background: "rgba(10,14,26,0.5)", border: "1px dashed rgba(255,255,255,0.1)", borderRadius: 12 }}>
+          No promotional campaigns found. Get started by clicking "+ New".
         </div>
       ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-          {campaigns.map((c) => (
-            <div key={c.id} style={{ display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 16, background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 6 }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{c.name}</div>
-                  <span style={{ 
-                    background: c.is_active ? "rgba(16,185,129,0.15)" : "rgba(100,116,139,0.15)", 
-                    color: c.is_active ? "#10b981" : "#64748b", 
-                    fontSize: 10, fontWeight: 700, padding: "2px 6px", borderRadius: 4, textTransform: "uppercase" 
-                  }}>
-                    {c.is_active ? "Active" : "Inactive"}
-                  </span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 16 }}>
+          {campaigns.map((c) => {
+            const total = c.total_tokens || 0;
+            const redeemed = c.redeemed_tokens || 0;
+            const rate = total > 0 ? Math.round((redeemed / total) * 100) : 0;
+            const startsFormatted = c.starts_at ? new Date(c.starts_at).toLocaleDateString() : "Immediate";
+            const endsFormatted = c.ends_at ? new Date(c.ends_at).toLocaleDateString() : "Never Expires";
+
+            return (
+              <div key={c.id} style={{ 
+                display: "flex", flexDirection: "column", justifyContent: "space-between", padding: 20, 
+                background: "rgba(10,14,26,0.6)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 14, 
+                boxShadow: "0 10px 20px -10px rgba(0,0,0,0.3)", position: "relative", overflow: "hidden"
+              }}>
+                {/* Glowing neon accent header */}
+                <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: c.is_active ? `linear-gradient(90deg, ${brand.brand_color}, #06b6d4)` : "transparent" }} />
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: "#fff", letterSpacing: "-0.01em" }}>{c.name}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                      {c.is_active && (
+                        <span style={{ display: "inline-block", width: 6, height: 6, background: "#10b981", borderRadius: "50%", boxShadow: "0 0 8px #10b981" }} />
+                      )}
+                      <span style={{ 
+                        background: c.is_active ? "rgba(16,185,129,0.15)" : "rgba(255,255,255,0.05)", 
+                        color: c.is_active ? "#10b981" : "#94a3b8", 
+                        fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 6, textTransform: "uppercase", letterSpacing: 0.5
+                      }}>
+                        {c.is_active ? "Active" : "Paused"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p style={{ fontSize: 12, color: "#94a3b8", lineHeight: 1.5, margin: "0 0 16px 0" }}>
+                    {c.description || "No promotional description provided."}
+                  </p>
+
+                  {/* Real-time Redemption Neon Progress Bar */}
+                  <div style={{ marginBottom: 18 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, fontWeight: 600, color: "#64748b", marginBottom: 6 }}>
+                      <span>Redemption Progress</span>
+                      <span style={{ color: brand.brand_color }}>{redeemed} / {total} claimed ({rate}%)</span>
+                    </div>
+                    <div style={{ height: 6, background: "rgba(255,255,255,0.05)", borderRadius: 10, overflow: "hidden", position: "relative" }}>
+                      <div style={{ height: "100%", width: `${rate}%`, background: `linear-gradient(90deg, ${brand.brand_color}, #06b6d4)`, borderRadius: 10, transition: "width 0.4s ease" }} />
+                    </div>
+                  </div>
+
+                  {/* Schedule Badges */}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 16 }}>
+                    <div style={{ flex: 1, minWidth: 100, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 8, padding: "6px 10px", textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>Starts</div>
+                      <div style={{ fontSize: 11, color: "#e2e8f0", fontWeight: 600, marginTop: 2 }}>{startsFormatted}</div>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 100, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 8, padding: "6px 10px", textAlign: "center" }}>
+                      <div style={{ fontSize: 9, color: "#64748b", textTransform: "uppercase", fontWeight: 700 }}>Expires</div>
+                      <div style={{ fontSize: 11, color: "#e2e8f0", fontWeight: 600, marginTop: 2 }}>{endsFormatted}</div>
+                    </div>
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: "#64748b", lineHeight: 1.4, marginBottom: 12 }}>
-                  {c.description || "No description provided."}
+
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, color: "#94a3b8", borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12, marginTop: 6 }}>
+                    <span style={{ fontWeight: 600 }}>Incentive Rate</span>
+                    <span style={{ fontWeight: 800, color: brand.brand_color, fontSize: 13 }}>{c.points_per_scan} pts / scan</span>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                    <button onClick={() => toggleCampaign(c.id, c.is_active)} style={{
+                      flex: 1.2, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px",
+                      color: "#e2e8f0", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s",
+                    }}>
+                      {c.is_active ? "Pause Promo" : "Resume"}
+                    </button>
+                    <button onClick={() => deleteCampaign(c.id)} style={{
+                      flex: 0.8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "8px 12px",
+                      color: "#f87171", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s",
+                    }}>
+                      Archive
+                    </button>
+                  </div>
                 </div>
               </div>
-              <div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11, color: "#94a3b8", borderTop: "1px solid #1f2937", paddingTop: 10, marginTop: 10 }}>
-                  <span>Points Value:</span>
-                  <span style={{ fontWeight: 700, color: brand.brand_color }}>{c.points_per_scan} pts/scan</span>
-                </div>
-                <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
-                  <button onClick={() => toggleCampaign(c.id, c.is_active)} style={{
-                    flex: 1, background: "transparent", border: "1px solid #334155", borderRadius: 6, padding: "5px 10px",
-                    color: "#94a3b8", fontSize: 11, fontWeight: 600, cursor: "pointer",
-                  }}>
-                    {c.is_active ? "Deactivate" : "Activate"}
-                  </button>
-                  <button onClick={() => deleteCampaign(c.id)} style={{
-                    background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 6, padding: "5px 10px",
-                    color: "#ef4444", fontSize: 11, fontWeight: 600, cursor: "pointer",
-                  }}>
-                    Archive
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
