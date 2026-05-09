@@ -230,10 +230,10 @@ router.get(
   async (req: BrandAuthedRequest, res: Response) => {
     try {
       const result = await pool.query(
-        `SELECT DISTINCT campaign_name FROM qr_tokens WHERE brand_id = $1 ORDER BY campaign_name`,
+        `SELECT name FROM campaigns WHERE brand_id = $1 ORDER BY name`,
         [req.brandId!]
       );
-      res.json({ success: true, campaigns: result.rows.map(r => r.campaign_name) });
+      res.json({ success: true, campaigns: result.rows.map(r => r.name) });
     } catch (error: any) {
       res.status(500).json({ success: false, error: error.message });
     }
