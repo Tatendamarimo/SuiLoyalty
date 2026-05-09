@@ -758,6 +758,85 @@ function CreateCampaignModal({ brandId, onCreated }: { brandId: string; onCreate
   );
 }
 
+function EditCampaignModal({ campaign, onUpdated }: { campaign: any; onUpdated: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(campaign.name || "");
+  const [description, setDescription] = useState(campaign.description || "");
+  const [endsAt, setEndsAt] = useState(campaign.ends_at ? new Date(campaign.ends_at).toISOString().slice(0, 16) : "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  async function update() {
+    if (!name.trim()) { setError("Campaign name is required"); return; }
+    setLoading(true); setError("");
+    try {
+      const res = await fetch(`/api/brand/campaigns/${campaign.id}`, {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          name: name.trim(), 
+          description: description.trim(),
+          ends_at: endsAt ? new Date(endsAt).toISOString() : null
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to update campaign");
+      setOpen(false);
+      onUpdated();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} style={{
+        flex: 1.2, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px",
+        color: "#e2e8f0", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s",
+      }}>
+        Edit Details
+      </button>
+      {open && (
+        <div onClick={() => { setOpen(false); setError(""); }} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 14, padding: "24px 20px", width: "100%", maxWidth: 420, maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)", textAlign: "left" }}>
+            <h2 style={{ fontSize: 16, fontWeight: 700, color: "#e2e8f0", marginBottom: 18 }}>Edit Campaign</h2>
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Campaign name *</label>
+                <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
+                <div style={{ flex: "1 1 170px" }}>
+                  <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600, display: "flex", alignItems: "center", gap: 4 }}>
+                    Points/scan <span title="Points are locked to prevent promotional tampering" style={{ cursor: "help", color: "#6366f1", fontWeight: 800 }}>ⓘ Locked</span>
+                  </label>
+                  <input type="number" value={campaign.points_per_scan} disabled style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.04)", borderRadius: 8, color: "#64748b", fontSize: 13, outline: "none", boxSizing: "border-box", cursor: "not-allowed" }} />
+                </div>
+                <div style={{ flex: "1 1 170px" }}>
+                  <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Campaign Expiry Date</label>
+                  <input type="datetime-local" value={endsAt} onChange={(e) => setEndsAt(e.target.value)} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box" }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 10, color: "#64748b", textTransform: "uppercase", fontWeight: 600 }}>Description</label>
+                <textarea value={description} onChange={(e) => setDescription(e.target.value)} style={{ width: "100%", marginTop: 6, padding: "8px 12px", background: "#0a0e1a", border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none", boxSizing: "border-box", height: 60, resize: "none" }} />
+              </div>
+              {error && <p style={{ color: "#fca5a5", fontSize: 11, margin: 0 }}>{error}</p>}
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 20 }}>
+              <button onClick={update} disabled={loading} style={{ flex: 1, padding: "10px", background: loading ? "#334155" : "#6366f1", border: "none", borderRadius: 8, color: "#fff", fontSize: 13, fontWeight: 700, cursor: loading ? "wait" : "pointer" }}>{loading ? "Saving…" : "Save Changes"}</button>
+              <button onClick={() => { setOpen(false); setError(""); }} style={{ padding: "10px 14px", background: "transparent", border: "1px solid #334155", borderRadius: 8, color: "#94a3b8", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 function QRGenerationCard({ brand, qrLoaded, onGenerated, showToast }: {
   brand: Membership; qrLoaded: boolean; onGenerated: () => void; showToast: (m: string, t?: "success" | "error") => void;
 }) {
@@ -1184,15 +1263,16 @@ function CampaignsPanel({ brand, showToast }: { brand: Membership; showToast: (m
                     <span style={{ fontWeight: 600 }}>Incentive Rate</span>
                     <span style={{ fontWeight: 800, color: brand.brand_color, fontSize: 13 }}>{c.points_per_scan} pts / scan</span>
                   </div>
-                  <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 14 }}>
+                    <EditCampaignModal campaign={c} onUpdated={() => setRefreshTrigger(prev => prev + 1)} />
                     <button onClick={() => toggleCampaign(c.id, c.is_active)} style={{
-                      flex: 1.2, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px",
+                      flex: "1 1 100px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px",
                       color: "#e2e8f0", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s",
                     }}>
-                      {c.is_active ? "Pause Promo" : "Resume"}
+                      {c.is_active ? "Pause" : "Resume"}
                     </button>
                     <button onClick={() => deleteCampaign(c.id)} style={{
-                      flex: 0.8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "8px 12px",
+                      flex: "1 1 80px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "8px 12px",
                       color: "#f87171", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s",
                     }}>
                       Archive
