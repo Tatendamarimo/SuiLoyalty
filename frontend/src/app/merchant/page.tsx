@@ -32,6 +32,10 @@ type Inventory = { tokens: InventoryToken[]; stats: { total: number; printed: nu
 type Toast = { id: number; message: string; type: "success" | "error" };
 type AuthState = "loading" | "signin" | "no_access" | "brand_picker" | "dashboard";
 
+// Role helpers
+const canManageCampaigns = (role: string) => role === "owner" || role === "admin";
+const canManageMembers  = (role: string) => role === "owner";
+
 // ─── API helper ──────────────────────────────────────────────────────────────
 
 function authHeaders(): HeadersInit {
@@ -1115,10 +1119,226 @@ function GoogleIcon() {
 
 // ─── Campaigns Panel ────────────────────────────────────────────────────────
 
+// ─── Team Panel ─────────────────────────────────────────────────────────────────────────
+type TeamMember = { user_id: string; wallet_address: string; display_name: string | null; email: string | null; role: string; created_at: string; };
+
+function TeamPanel({ brand, showToast }: { brand: Membership; showToast: (m: string, t?: "success" | "error") => void }) {
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [inviteAddress, setInviteAddress] = useState("");
+  const [inviteRole, setInviteRole] = useState<"admin" | "operator">("operator");
+  const [inviting, setInviting] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+  const isOwner = brand.role === "owner";
+  const isAdminOrOwner = brand.role === "owner" || brand.role === "admin";
+
+  const loadMembers = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/brands/${brand.brand_id}/members`, { credentials: "include" });
+      const data = await res.json();
+      if (data.success) setMembers(data.members || []);
+    } catch { /* silent */ } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { loadMembers(); }, [brand.brand_id]);
+
+  async function inviteMember() {
+    if (!inviteAddress.trim() || !inviteAddress.startsWith("0x")) {
+      showToast("Enter a valid 0x wallet address", "error"); return;
+    }
+    setInviting(true);
+    try {
+      const res = await fetch(`/api/brands/${brand.brand_id}/members`, {
+        method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ wallet_address: inviteAddress.trim(), role: inviteRole }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to invite member");
+      showToast(`Access granted as ${inviteRole}!`, "success");
+      setInviteAddress("");
+      await loadMembers();
+    } catch (e: any) { showToast(e.message, "error"); }
+    finally { setInviting(false); }
+  }
+
+  async function removeMember(member: TeamMember) {
+    if (!confirm(`Remove ${member.display_name || member.wallet_address.slice(0, 12)}… from the team?`)) return;
+    setRemoving(member.user_id);
+    try {
+      const res = await fetch(`/api/brands/${brand.brand_id}/members/${member.user_id}`, {
+        method: "DELETE", credentials: "include",
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || "Failed to remove member");
+      showToast("Member removed.", "success");
+      await loadMembers();
+    } catch (e: any) { showToast(e.message, "error"); }
+    finally { setRemoving(null); }
+  }
+
+  const roleColor: Record<string, string> = { owner: "#6366f1", admin: "#f59e0b", operator: "#10b981" };
+  const roleBg:    Record<string, string> = { owner: "rgba(99,102,241,0.12)", admin: "rgba(245,158,11,0.12)", operator: "rgba(16,185,129,0.12)" };
+
+  return (
+    <div style={{ maxWidth: 820, margin: "0 auto" }}>
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#e2e8f0" }}>Team Members</div>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 3 }}>
+            {members.length} member{members.length !== 1 ? "s" : ""} have access to {brand.brand_name}
+          </div>
+        </div>
+        {isAdminOrOwner && (
+          <div style={{ fontSize: 10, color: "#64748b", background: "#0f1421", border: "1px solid #1f2937", borderRadius: 8, padding: "6px 12px" }}>
+            Your role: <span style={{ color: roleColor[brand.role] || "#94a3b8", fontWeight: 700, textTransform: "uppercase" }}>{brand.role}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Role Permission Legend */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 24 }}>
+        {[
+          { role: "owner",    desc: "Full control — settings, members, campaigns, QR" },
+          { role: "admin",    desc: "Manage campaigns, QR codes & redemptions" },
+          { role: "operator", desc: "Generate QR codes & fulfil redemptions only" },
+        ].map(({ role, desc }) => (
+          <div key={role} style={{ display: "flex", alignItems: "center", gap: 8, background: roleBg[role], border: `1px solid ${roleColor[role]}30`, borderRadius: 8, padding: "6px 12px" }}>
+            <span style={{ width: 6, height: 6, background: roleColor[role], borderRadius: "50%", flexShrink: 0, display: "inline-block" }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: roleColor[role], textTransform: "uppercase", letterSpacing: 0.5 }}>{role}</span>
+            <span style={{ fontSize: 10, color: "#64748b" }}>{desc}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Members list */}
+      <div style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 12, marginBottom: 24, overflow: "hidden" }}>
+        <div style={{ padding: "12px 18px", borderBottom: "1px solid #1f2937", display: "flex", alignItems: "center", gap: 8 }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6366f1" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>Access List</span>
+        </div>
+        {loading ? (
+          <div style={{ padding: 32, textAlign: "center", color: "#64748b", fontSize: 12 }}>Loading members…</div>
+        ) : members.length === 0 ? (
+          <div style={{ padding: 32, textAlign: "center", color: "#64748b", fontSize: 12 }}>No members found.</div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            {members.map((m, i) => (
+              <div key={m.user_id} style={{
+                display: "flex", alignItems: "center", gap: 14, padding: "14px 18px",
+                borderTop: i > 0 ? "1px solid #1f2937" : "none",
+                transition: "background 0.15s",
+              }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#0a0e1a")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                {/* Avatar */}
+                <div style={{
+                  width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                  background: roleBg[m.role] || "rgba(255,255,255,0.05)",
+                  border: `2px solid ${roleColor[m.role] || "#334155"}`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 14, fontWeight: 800, color: roleColor[m.role] || "#94a3b8",
+                }}>
+                  {(m.display_name || m.email || m.wallet_address)[0].toUpperCase()}
+                </div>
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {m.display_name || m.email || "Unnamed member"}
+                  </div>
+                  <div style={{ fontSize: 11, color: "#64748b", fontFamily: "monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    {m.wallet_address ? `${m.wallet_address.slice(0, 10)}…${m.wallet_address.slice(-6)}` : "No address"}
+                  </div>
+                </div>
+                {/* Role badge */}
+                <span style={{
+                  background: roleBg[m.role] || "rgba(255,255,255,0.05)",
+                  color: roleColor[m.role] || "#94a3b8",
+                  fontSize: 9, fontWeight: 800, padding: "3px 8px", borderRadius: 6,
+                  textTransform: "uppercase", letterSpacing: 0.8, flexShrink: 0,
+                  border: `1px solid ${roleColor[m.role] || "#334155"}30`,
+                }}>
+                  {m.role}
+                </span>
+                {/* Remove button — owner only, can't remove yourself or other owners */}
+                {isOwner && m.role !== "owner" && (
+                  <button
+                    disabled={removing === m.user_id}
+                    onClick={() => removeMember(m)}
+                    style={{
+                      background: removing === m.user_id ? "transparent" : "rgba(239,68,68,0.08)",
+                      border: "1px solid rgba(239,68,68,0.2)", borderRadius: 6, padding: "5px 10px",
+                      color: "#f87171", fontSize: 11, fontWeight: 600, cursor: removing === m.user_id ? "wait" : "pointer",
+                      flexShrink: 0, transition: "all 0.15s",
+                    }}
+                  >
+                    {removing === m.user_id ? "…" : "Remove"}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Invite form — owner/admin only */}
+      {isAdminOrOwner && (
+        <div style={{ background: "#0f1421", border: "1px solid #1f2937", borderRadius: 12, padding: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 4 }}>Grant Access</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 16 }}>
+            Enter a team member's Sui wallet address to give them access.
+            {!isOwner && <span style={{ color: "#f59e0b" }}> Admins can invite operators only.</span>}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            <input
+              value={inviteAddress} onChange={(e) => setInviteAddress(e.target.value)}
+              placeholder="0x... wallet address"
+              style={{
+                flex: "1 1 240px", padding: "9px 12px", background: "#0a0e1a",
+                border: "1px solid #334155", borderRadius: 8, color: "#e2e8f0",
+                fontSize: 13, outline: "none", fontFamily: "monospace",
+              }}
+            />
+            <select
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value as "admin" | "operator")}
+              disabled={!isOwner}
+              style={{
+                padding: "9px 12px", background: "#0a0e1a", border: "1px solid #334155",
+                borderRadius: 8, color: "#e2e8f0", fontSize: 13, outline: "none",
+                cursor: isOwner ? "pointer" : "not-allowed",
+              }}
+            >
+              {isOwner && <option value="admin">Admin</option>}
+              <option value="operator">Operator</option>
+            </select>
+            <button
+              onClick={inviteMember} disabled={inviting}
+              style={{
+                padding: "9px 18px", background: inviting ? "#334155" : "#6366f1",
+                border: "none", borderRadius: 8, color: "#fff",
+                fontSize: 13, fontWeight: 700, cursor: inviting ? "wait" : "pointer", flexShrink: 0,
+              }}
+            >
+              {inviting ? "Granting…" : "Grant Access"}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CampaignsPanel({ brand, showToast }: { brand: Membership; showToast: (m: string, t?: "success" | "error") => void }) {
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const canManage = canManageCampaigns(brand.role);
 
   useEffect(() => {
     setLoading(true);
@@ -1179,7 +1399,13 @@ function CampaignsPanel({ brand, showToast }: { brand: Membership; showToast: (m
           <h3 style={{ fontSize: 18, fontWeight: 800, color: "#fff", margin: 0, letterSpacing: "-0.02em", background: "linear-gradient(90deg, #fff, #94a3b8)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Active Campaigns</h3>
           <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>Monitor and manage real-time promotional performance for {brand.brand_name}</div>
         </div>
-        <CreateCampaignModal brandId={brand.brand_id} onCreated={() => setRefreshTrigger(prev => prev + 1)} />
+        {canManage ? (
+          <CreateCampaignModal brandId={brand.brand_id} onCreated={() => setRefreshTrigger(prev => prev + 1)} />
+        ) : (
+          <span style={{ fontSize: 11, color: "#64748b", background: "#0a0e1a", border: "1px solid #1f2937", borderRadius: 6, padding: "4px 10px" }}>
+            View only — contact an admin to manage
+          </span>
+        )}
       </div>
 
       {loading ? (
@@ -1257,19 +1483,21 @@ function CampaignsPanel({ brand, showToast }: { brand: Membership; showToast: (m
                     <span style={{ fontWeight: 800, color: brand.brand_color, fontSize: 13 }}>{c.points_per_scan} pts / scan</span>
                   </div>
                   <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 14 }}>
-                    <EditCampaignModal campaign={c} onUpdated={() => setRefreshTrigger(prev => prev + 1)} />
+                    {canManage && <EditCampaignModal campaign={c} onUpdated={() => setRefreshTrigger(prev => prev + 1)} />}
                     <button onClick={() => toggleCampaign(c.id, c.is_active)} style={{
                       flex: "1 1 100px", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, padding: "8px 12px",
                       color: "#e2e8f0", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s",
                     }}>
                       {c.is_active ? "Pause" : "Resume"}
                     </button>
-                    <button onClick={() => deleteCampaign(c.id)} style={{
-                      flex: "1 1 80px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "8px 12px",
-                      color: "#f87171", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s",
-                    }}>
-                      Archive
-                    </button>
+                    {canManage && (
+                      <button onClick={() => deleteCampaign(c.id)} style={{
+                        flex: "1 1 80px", background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 8, padding: "8px 12px",
+                        color: "#f87171", fontSize: 12, fontWeight: 700, cursor: "pointer", transition: "all 0.15s",
+                      }}>
+                        Archive
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1285,7 +1513,7 @@ function CampaignsPanel({ brand, showToast }: { brand: Membership; showToast: (m
 
 export default function Merchant() {
   const [authState, setAuthState] = useState<AuthState>("loading");
-  const [activeTab, setActiveTab] = useState<"overview" | "campaigns">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "campaigns" | "team">("overview");
   const [authError, setAuthError] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
@@ -1502,44 +1730,39 @@ export default function Merchant() {
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "28px 24px" }}>
         <SummaryTiles summary={summary} brand={activeBrand} />
 
-        {/* Sleek Tab Bar */}
-        <div style={{ display: "flex", gap: 16, borderBottom: "1px solid #1f2937", marginBottom: 24, paddingBottom: 2 }}>
-          <button 
-            onClick={() => setActiveTab("overview")} 
-            style={{ 
-              background: "none", border: "none", padding: "8px 16px", color: activeTab === "overview" ? activeBrand.brand_color : "#64748b", 
-              fontWeight: 600, fontSize: 13, cursor: "pointer", borderBottom: activeTab === "overview" ? `2px solid ${activeBrand.brand_color}` : "none",
-              transition: "all 0.15s"
-            }}
-          >
-            Overview
-          </button>
-          <button 
-            onClick={() => setActiveTab("campaigns")} 
-            style={{ 
-              background: "none", border: "none", padding: "8px 16px", color: activeTab === "campaigns" ? activeBrand.brand_color : "#64748b", 
-              fontWeight: 600, fontSize: 13, cursor: "pointer", borderBottom: activeTab === "campaigns" ? `2px solid ${activeBrand.brand_color}` : "none",
-              transition: "all 0.15s"
-            }}
-          >
-            Campaigns
-          </button>
+        {/* Tab Bar */}
+        <div style={{ display: "flex", gap: 0, borderBottom: "1px solid #1f2937", marginBottom: 24 }}>
+          {(["overview", "campaigns", "team"] as const).map((tab) => {
+            const labels: Record<string, string> = { overview: "Overview", campaigns: "Campaigns", team: "Team" };
+            const isActive = activeTab === tab;
+            return (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                style={{
+                  background: "none", border: "none", borderBottom: isActive ? `2px solid ${activeBrand.brand_color}` : "2px solid transparent",
+                  padding: "10px 20px", color: isActive ? activeBrand.brand_color : "#64748b",
+                  fontWeight: 600, fontSize: 13, cursor: "pointer", transition: "all 0.15s", marginBottom: -1,
+                }}
+              >
+                {labels[tab]}
+              </button>
+            );
+          })}
         </div>
 
-        {activeTab === "overview" ? (
+        {activeTab === "overview" && (
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 0 }}>
             <PendingRedemptionsPanel brandId={activeBrand.brand_id} onChange={refreshSummary} showToast={showToast} />
-
             <div className="merchant-split-grid">
               <QRGenerationCard brand={activeBrand} qrLoaded={qrLoaded} onGenerated={refreshInventory} showToast={showToast} />
               <InventoryPanel inventory={inventory} brand={activeBrand} onRefresh={refreshInventory} />
             </div>
-
             <ReportExportCard brandId={activeBrand.brand_id} refreshTrigger={inventory?.stats?.printed || 0} />
           </div>
-        ) : (
-          <CampaignsPanel brand={activeBrand} showToast={showToast} />
         )}
+        {activeTab === "campaigns" && <CampaignsPanel brand={activeBrand} showToast={showToast} />}
+        {activeTab === "team" && <TeamPanel brand={activeBrand} showToast={showToast} />}
       </div>
 
       <ToastContainer toasts={toasts} onDismiss={(id) => setToasts((p) => p.filter((t) => t.id !== id))} />

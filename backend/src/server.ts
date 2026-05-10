@@ -496,7 +496,7 @@ app.post('/api/brands/:brand_id/members', async (req, res) => {
   }
 });
 
-// ─── Brands: list members (owner/admin) ──────────────────────────────────────
+// ─── Brands: list members (any member) ───────────────────────────────────────
 app.get('/api/brands/:brand_id/members', async (req, res) => {
   if (!req.session?.userId) {
     return res.status(401).json({ success: false, error: 'Sign in first' });
@@ -511,12 +511,58 @@ app.get('/api/brands/:brand_id/members', async (req, res) => {
       return res.status(403).json({ success: false, error: 'No access to this brand' });
     }
     const members = await pool.query(
-      `SELECT u.wallet_address, u.display_name, u.email, bm.role, bm.created_at
+      `SELECT u.id AS user_id, u.wallet_address, u.display_name, u.email, bm.role, bm.created_at
        FROM brand_members bm JOIN users u ON u.id = bm.user_id
-       WHERE bm.brand_id = $1 ORDER BY bm.created_at`,
+       WHERE bm.brand_id = $1 ORDER BY
+         CASE bm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 ELSE 2 END, bm.created_at`,
       [brand_id],
     );
     res.json({ success: true, members: members.rows });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ─── Brands: remove member (owner only) ──────────────────────────────────────
+app.delete('/api/brands/:brand_id/members/:target_user_id', async (req, res) => {
+  if (!req.session?.userId) {
+    return res.status(401).json({ success: false, error: 'Sign in first' });
+  }
+  try {
+    const { brand_id, target_user_id } = req.params;
+
+    // Only owners may remove members
+    const callerRole = await pool.query(
+      `SELECT role FROM brand_members WHERE user_id = $1 AND brand_id = $2`,
+      [req.session.userId, brand_id],
+    );
+    if (callerRole.rows.length === 0 || callerRole.rows[0].role !== 'owner') {
+      return res.status(403).json({ success: false, error: 'Only owners can remove members' });
+    }
+
+    // Cannot remove yourself
+    if (target_user_id === req.session.userId) {
+      return res.status(400).json({ success: false, error: 'Cannot remove yourself from the brand' });
+    }
+
+    // Cannot remove another owner
+    const targetRole = await pool.query(
+      `SELECT role FROM brand_members WHERE user_id = $1 AND brand_id = $2`,
+      [target_user_id, brand_id],
+    );
+    if (targetRole.rows.length === 0) {
+      return res.status(404).json({ success: false, error: 'Member not found' });
+    }
+    if (targetRole.rows[0].role === 'owner') {
+      return res.status(400).json({ success: false, error: 'Cannot remove another owner' });
+    }
+
+    await pool.query(
+      `DELETE FROM brand_members WHERE user_id = $1 AND brand_id = $2`,
+      [target_user_id, brand_id],
+    );
+
+    res.json({ success: true, message: 'Member removed' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -591,10 +637,21 @@ app.get('/api/qr/brand/:brand_id', async (req, res) => {
   }
 });
 
-// ─── QR: generate ─────────────────────────────────────────────────────────────
+// ─── QR: generate (requires active session) ───────────────────────────────────
 app.post('/api/qr/generate', async (req, res) => {
+  if (!req.session?.userId) {
+    return res.status(401).json({ success: false, error: 'Sign in first' });
+  }
   try {
     const { brand_id, points_value, campaign_name, expires_in_days, campaign_id } = req.body;
+    // Verify caller has at least operator access to the brand
+    const memberCheck = await pool.query(
+      `SELECT role FROM brand_members WHERE user_id = $1 AND brand_id = $2`,
+      [req.session.userId, brand_id]
+    );
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ success: false, error: 'No access to this brand' });
+    }
     const token = await generateQRToken(brand_id, points_value, campaign_name, expires_in_days, campaign_id);
     res.status(201).json({ success: true, token });
   } catch (error: any) {
