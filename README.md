@@ -51,7 +51,7 @@ Three-tier architecture:
                           └─────────────────────┘
 ```
 
-Detailed architecture, sequence flows, and ER diagrams: [`docs/architecture.html`](docs/architecture.html), [`docs/sequence-flows.html`](docs/sequence-flows.html).
+Detailed architecture, sequence flows, and ER diagrams are provided in the final thesis documentation.
 
 ---
 
@@ -79,7 +79,7 @@ cd frontend && npm run dev         # http://localhost:3001  (PWA)
 cd contracts && sui move test      # optional — runs the Move test suite
 ```
 
-Open `http://localhost:3001` and pick your audience. Full deployment guide with Google Cloud setup, troubleshooting, and CI/CD details: [`docs/deployment.html`](docs/deployment.html).
+Open `http://localhost:3001` and pick your audience.
 
 ---
 
@@ -108,10 +108,7 @@ SuiLoyalty/
 │       └── merchant/               Brand portal — picker, dashboard, QR generator, PDF/CSV reports
 ├── database/
 │   └── schema.sql                  Canonical PostgreSQL schema
-├── docs/
-│   ├── architecture.html           System architecture + class diagrams
-│   ├── deployment.html             Full deployment guide
-│   └── sequence-flows.html         OAuth, scan, replay, merchant flows
+
 └── .github/workflows/     CI for backend, contracts, frontend
 ```
 
@@ -126,7 +123,7 @@ SuiLoyalty/
 | Backend coverage | Jest with `lines: 80` threshold | — | `cd backend && npm run test:coverage` |
 | Frontend type safety | TypeScript strict + Next.js build | — | `cd frontend && npx tsc --noEmit && npm run build` |
 
-Full test catalogue with descriptions and expected results: [`TEST_DOCUMENTATION.md`](TEST_DOCUMENTATION.md).
+
 
 ---
 
@@ -134,13 +131,9 @@ Full test catalogue with descriptions and expected results: [`TEST_DOCUMENTATION
 
 | Document | Purpose |
 | --- | --- |
-| [`docs/architecture.html`](docs/architecture.html) | System architecture, smart contract class diagram, ER diagram, security model |
-| [`docs/deployment.html`](docs/deployment.html) | Step-by-step deployment, Google Cloud OAuth setup, secrets policy, troubleshooting |
-| [`docs/sequence-flows.html`](docs/sequence-flows.html) | OAuth sign-in, QR scan (new + returning user), replay prevention, merchant flows |
-| [`SuiLoyalty_Database_Design.docx`](SuiLoyalty_Database_Design.docx) | PostgreSQL schema design rationale |
-| [`Migration_Summary.md`](Migration_Summary.md) | Owned-to-Shared object architecture migration record |
+| [`SuiLoyalty_Project_Analysis.docx`](SuiLoyalty_Project_Analysis.docx) | Project analysis and requirements |
 | [`SuiLoyalty_Contract_Alignment_Audit.docx`](SuiLoyalty_Contract_Alignment_Audit.docx) | Self-assessment against the signed Project Contract |
-| [`SuiLoyalty_Sprint{1..4}_Journal.docx`](.) | Per-sprint development journals |
+| `SuiLoyalty_Sprint{1..4}_Journal.docx` | Per-sprint development journals |
 
 ---
 
