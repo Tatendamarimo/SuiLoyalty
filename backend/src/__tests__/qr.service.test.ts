@@ -68,8 +68,11 @@ describe('generateQRToken', () => {
     expect(mockPoolQuery).toHaveBeenCalledTimes(1);
     const [sql, params] = mockPoolQuery.mock.calls[0] as [string, unknown[]];
     expect(sql).toContain('INSERT INTO qr_tokens');
-    expect(params[1]).toBeNull();   // no brand_id
-    expect(params[2]).toBe(10);     // default points
+    // INSERT parameter order in qr.service.ts (after migration 006):
+    //   [token_uuid, expiresAt, brand_id, points_value, campaign_name, campaign_id]
+    expect(params[1]).toBeNull();   // no expires_in_days → expiresAt = null
+    expect(params[2]).toBeNull();   // no brand_id
+    expect(params[3]).toBe(10);     // default points
     expect(result).toEqual(fakeToken);
   });
 
@@ -79,8 +82,9 @@ describe('generateQRToken', () => {
     await generateQRToken(BRAND_ID, 50);
 
     const [, params] = mockPoolQuery.mock.calls[0] as [string, unknown[]];
-    expect(params[1]).toBe(BRAND_ID);
-    expect(params[2]).toBe(50);
+    // Parameter order: [token_uuid, expiresAt, brand_id, points_value, campaign_name, campaign_id]
+    expect(params[2]).toBe(BRAND_ID);
+    expect(params[3]).toBe(50);
   });
 });
 
@@ -110,8 +114,10 @@ describe('validateQRToken — replay prevention', () => {
     const updateCall = calls.find(([sql]) => sql.includes('UPDATE qr_tokens'));
     expect(updateCall).toBeDefined();
     const [sql] = updateCall!;
-    expect(sql).toContain('used = FALSE');
-    expect(sql).toContain('expires_at IS NULL OR expires_at > NOW()');
+    // Current qr.service.ts UPDATE uses the `qt.` table alias on every column,
+    // so the substring assertion includes the alias prefix.
+    expect(sql).toContain('qt.used = FALSE');
+    expect(sql).toContain('qt.expires_at IS NULL OR qt.expires_at > NOW()');
   });
 });
 

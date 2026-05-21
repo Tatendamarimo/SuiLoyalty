@@ -32,9 +32,9 @@ jobs:
         working-directory: backend
         run: npx tsc --noEmit
 
-      - name: Run tests with coverage
+      - name: Run tests
         working-directory: backend
-        run: npm run test:coverage
+        run: npm test
         # All env values below are CI-only placeholders. The Jest suite mocks
         # blockchain.service and pg pool entirely, so no real network or
         # credentials are exercised. NEVER paste a real Sui private key,
@@ -54,11 +54,3 @@ jobs:
           # CI-only placeholder. Real Sui keys never live in this file —
           # blockchain.service is mocked in every test that imports it.
           SUI_PRIVATE_KEY: ci-test-sui-key-placeholder-not-a-real-key
-
-      - name: Upload coverage report
-        if: success()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-coverage
-          path: backend/coverage/
-          retention-days: 14

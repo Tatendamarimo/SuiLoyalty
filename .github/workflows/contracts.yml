@@ -18,12 +18,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Install Sui CLI
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          curl -fsSL \
-            https://github.com/MystenLabs/sui/releases/download/mainnet-v1.44.0/sui-mainnet-v1.44.0-ubuntu-x86_64.tgz \
-            -o sui.tgz
-          tar -xzf sui.tgz
-          sudo mv sui /usr/local/bin/sui
+          curl -sSfL https://raw.githubusercontent.com/Mystenlabs/suiup/main/install.sh | sh
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/.local/bin:$PATH"
+          suiup install sui@testnet -y
           sui --version
 
       - name: Build contracts
